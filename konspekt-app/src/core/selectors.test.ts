@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateDailyBudget, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, importantOpenTasks, topWishes } from './selectors';
+import { calculateDailyBudget, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, importantOpenTasks, topWishes, sortTopics, subjectProgress, ungroupedTopics, groupTopics, filteredTopicsForSubject } from './selectors';
 import { createEmptyState } from './types';
 
 describe('calculateDailyBudget', () => {
@@ -69,6 +69,44 @@ describe('daysAgoLabel', () => {
     expect(daysAgoLabel('2026-09-01', now)).toBe('5 дн. назад');
     expect(daysAgoLabel('2026-09-10', now)).toBe('через 4 дн.');
     expect(daysAgoLabel(null, now)).toBeNull();
+  });
+});
+
+describe('Study selectors', () => {
+  function studyState() {
+    const state = createEmptyState();
+    state.subjects = [{ id: 's1', name: 'История', color: 'teal', createdAt: 1 }];
+    state.groups = [{ id: 'g1', subjectId: 's1', name: 'Рим', color: 'rust', createdAt: 1 }];
+    state.topics = [
+      { id: 't1', subjectId: 's1', groupId: null, title: 'Первая тема', note: '', why: '', links: [], done: false, urgent: false, createdAt: 1 },
+      { id: 't2', subjectId: 's1', groupId: null, title: 'Срочная тема', note: '', why: '', links: [], done: false, urgent: true, createdAt: 2 },
+      { id: 't3', subjectId: 's1', groupId: 'g1', title: 'Тема в группе', note: 'заметка про Цезаря', why: '', links: [], done: false, urgent: false, createdAt: 3 },
+      { id: 't4', subjectId: 's1', groupId: null, title: 'Готовая', note: '', why: '', links: [], done: true, urgent: false, createdAt: 4 },
+      { id: 't5', subjectId: 'other', groupId: null, title: 'Чужой предмет', note: '', why: '', links: [], done: false, urgent: false, createdAt: 5 },
+    ];
+    return state;
+  }
+
+  it('sortTopics: done last, urgent-first among undone, then newest first', () => {
+    const sorted = sortTopics(studyState().topics.filter((t) => t.subjectId === 's1'));
+    expect(sorted.map((t) => t.id)).toEqual(['t2', 't3', 't1', 't4']);
+  });
+
+  it('subjectProgress counts only topics of that subject', () => {
+    expect(subjectProgress(studyState(), 's1')).toEqual({ done: 1, total: 4 });
+  });
+
+  it('ungroupedTopics / groupTopics split by groupId within a subject', () => {
+    const state = studyState();
+    expect(ungroupedTopics(state, 's1').map((t) => t.id)).toEqual(['t2', 't1', 't4']);
+    expect(groupTopics(state, 's1', 'g1').map((t) => t.id)).toEqual(['t3']);
+  });
+
+  it('filteredTopicsForSubject searches title+note and returns nothing for empty query', () => {
+    const state = studyState();
+    expect(filteredTopicsForSubject(state, 's1', '')).toEqual([]);
+    expect(filteredTopicsForSubject(state, 's1', 'цезаря').map((t) => t.id)).toEqual(['t3']);
+    expect(filteredTopicsForSubject(state, 's1', 'срочная').map((t) => t.id)).toEqual(['t2']);
   });
 });
 

@@ -262,3 +262,42 @@ export function topWishes(state: AppState, limit = 3) {
     .sort((a, b) => (Number(b.progress) || 0) / Number(b.amount) - (Number(a.progress) || 0) / Number(a.amount))
     .slice(0, limit);
 }
+
+// ---------- Study ----------
+
+// Порт sortTopics() из study.js: невыполненные сначала, срочные — выше в своей группе, дальше новые сверху.
+export function sortTopics<T extends { done: boolean; urgent: boolean; createdAt: number }>(list: T[]): T[] {
+  return list.slice().sort((a, b) => {
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
+    return b.createdAt - a.createdAt;
+  });
+}
+
+export function subjectTopics(state: AppState, subjectId: string) {
+  return state.topics.filter((t) => t.subjectId === subjectId);
+}
+
+export function subjectProgress(state: AppState, subjectId: string): { done: number; total: number } {
+  const topics = subjectTopics(state, subjectId);
+  return { done: topics.filter((t) => t.done).length, total: topics.length };
+}
+
+export function subjectGroups(state: AppState, subjectId: string) {
+  return state.groups.filter((g) => g.subjectId === subjectId);
+}
+
+export function ungroupedTopics(state: AppState, subjectId: string) {
+  return sortTopics(state.topics.filter((t) => t.subjectId === subjectId && !t.groupId));
+}
+
+export function groupTopics(state: AppState, subjectId: string, groupId: string) {
+  return sortTopics(state.topics.filter((t) => t.subjectId === subjectId && t.groupId === groupId));
+}
+
+// Поиск — по title+note, вперемешку по группам, только когда есть запрос.
+export function filteredTopicsForSubject(state: AppState, subjectId: string, query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  return sortTopics(state.topics.filter((t) => t.subjectId === subjectId && (t.title + ' ' + t.note).toLowerCase().includes(q)));
+}

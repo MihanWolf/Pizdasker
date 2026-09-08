@@ -9,7 +9,7 @@ const MODE_LABELS: { mode: AppMode; label: string; ready: boolean }[] = [
   { mode: 'shopping', label: 'Покупки', ready: true },
   { mode: 'notes', label: 'Заметки', ready: true },
   { mode: 'plants', label: 'Полив', ready: true },
-  { mode: 'study', label: 'Учёба', ready: false },
+  { mode: 'study', label: 'Учёба', ready: true },
 ];
 
 export function ModeSwitch() {
