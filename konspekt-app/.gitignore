@@ -1,0 +1,44 @@
+# --- Зависимости и пакеты ---
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.pnp/
+.pnp.js
+
+# --- Сборка / кэш ---
+dist/
+build/
+.cache/
+.parcel-cache/
+.vite/
+
+# --- Переменные окружения и секреты ---
+.env
+.env.*
+!.env.example
+
+# --- Логи ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# --- OS-мусор ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Редакторы / IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Локальные бэкапы и экспорты приложения ---
+*.bak
+konspekt-backup-*.json
+
+# --- Прочее временное ---
+*.tmp
+*.temp

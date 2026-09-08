@@ -1,0 +1,13 @@
+.mode-switch {
+  display: flex; flex-direction: column; gap: 6px; padding: 12px 8px;
+  border-right: 1px solid var(--rule); background: linear-gradient(180deg, #DEDFD5, #D6D7CB);
+  flex-shrink: 0;
+}
+.mode-switch-btn {
+  width: 96px; text-align: left; border: none; border-radius: 6px; padding: 9px 10px;
+  background: rgba(255,255,255,0.4); color: var(--ink-soft); font-size: 12.5px; cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.mode-switch-btn:hover:not(:disabled) { background: rgba(255,255,255,0.7); }
+.mode-switch-btn.active { background: var(--ink); color: #F4F3EC; }
+.mode-switch-btn.pending { opacity: 0.4; cursor: not-allowed; }

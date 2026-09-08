@@ -1,0 +1,48 @@
+.tasks-wrap { max-width: 820px; padding: 24px 40px; }
+
+.tasks-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 20px; }
+.tasks-title { font-family: 'Fraunces', serif; font-size: 34px; font-weight: 600; font-style: italic; }
+.tasks-summary { font-family: monospace; font-size: 11px; color: var(--ink-soft); padding-bottom: 5px; }
+
+.task-tabs { display: flex; gap: 18px; overflow-x: auto; border-bottom: 1px solid var(--rule); margin-bottom: 24px; }
+.task-tab { border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 8px 0 10px; color: var(--ink-faint); cursor: pointer; font-family: monospace; font-size: 11px; white-space: nowrap; }
+.task-tab span { margin-left: 5px; }
+.task-tab.active { border-bottom-color: var(--rust); color: var(--ink); }
+.task-tab-add { color: var(--rust); }
+.task-tab-add-input { width: 100px; font-size: 11px; border: 1px solid var(--rule); border-radius: 4px; padding: 4px 6px; }
+
+.task-project-title { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+.task-project-title h2 { font-family: 'Fraunces', serif; font-size: 25px; font-style: italic; }
+.task-project-delete { border: 0; background: transparent; color: var(--ink-faint); cursor: pointer; font-size: 19px; opacity: 0; transition: opacity .15s; }
+.task-project-title:hover .task-project-delete { opacity: 1; }
+.task-project-delete:hover { color: var(--urgent); }
+
+.task-add-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1.5px dashed var(--rule); border-radius: 8px; margin-bottom: 15px; background: rgba(255,255,255,0.35); }
+.task-add-row input[type="text"], .task-add-row input:not([type]) { flex: 1; min-width: 0; border: 0; background: transparent; outline: 0; font-size: 13.5px; }
+.task-add-row label { display: flex; align-items: center; gap: 5px; color: var(--ink-soft); font-family: monospace; font-size: 10px; white-space: nowrap; }
+.task-add-row button { border: 0; border-radius: 6px; background: var(--ink); color: #fff; padding: 7px 14px; cursor: pointer; font-size: 12px; }
+
+.task-filter-tabs { display: flex; gap: 18px; border-bottom: 1px solid var(--rule); margin-bottom: 3px; }
+.task-filter { border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 8px 0; color: var(--ink-faint); cursor: pointer; font-family: monospace; font-size: 10px; }
+.task-filter.active { border-bottom-color: var(--rust); color: var(--ink); }
+
+.task-list { margin-top: 4px; }
+.task-row { display: flex; align-items: center; gap: 11px; min-height: 58px; padding: 10px 4px; border-bottom: 1px dashed var(--rule); }
+.task-row-enter { animation: task-row-in 0.26s cubic-bezier(.2,.8,.3,1) both; }
+@keyframes task-row-in { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
+.task-row-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.task-row-copy strong { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-row-copy small { font-family: monospace; color: var(--ink-faint); font-size: 10px; }
+.task-row.done strong { text-decoration: line-through; color: var(--ink-faint); }
+.task-check { width: 23px; height: 23px; border: 1.5px solid var(--rule); border-radius: 50%; background: rgba(255,255,255,0.5); color: #fff; cursor: pointer; flex-shrink: 0; font-size: 13px; transition: border-color .15s, background .15s; }
+.task-check:hover { border-color: var(--forest); }
+.task-check.checked { background: var(--forest); border-color: var(--forest); }
+.task-important, .task-delete { border: 0; background: transparent; cursor: pointer; color: var(--rule); font-size: 18px; padding: 2px 4px; }
+.task-important.active { color: var(--rust); }
+.task-delete { color: var(--ink-faint); opacity: 0; font-size: 16px; transition: opacity .15s; }
+.task-row:hover .task-delete { opacity: 1; }
+.task-delete:hover { color: var(--urgent); }
+
+.task-empty { padding: 42px 10px; color: var(--ink-faint); font-size: 13px; }
+.task-empty-title { display: block; color: var(--ink-soft); font-size: 20px; margin-bottom: 6px; font-family: 'Fraunces', serif; }
+.task-empty-small { padding: 28px 4px; }

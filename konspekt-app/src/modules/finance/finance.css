@@ -1,0 +1,50 @@
+.finance-wrap { padding: 24px 40px; }
+
+.finance-header { margin-bottom: 22px; display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.finance-title { font-family: 'Fraunces', serif; font-size: 27px; font-weight: 600; font-style: italic; }
+.finance-totals { display: flex; gap: 20px; font-size: 13px; color: var(--ink-soft); flex-wrap: wrap; }
+.debt-color { color: var(--debt, #AB3D33); }
+.wish-color { color: var(--wish, #D0A020); }
+
+.finance-columns { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; }
+.finance-section { flex: 1; min-width: 280px; }
+.finance-section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.finance-pill { display: inline-flex; align-items: center; padding: 5px 14px; border-radius: 14px; color: #fff; font-family: 'Fraunces', serif; font-weight: 600; font-style: italic; font-size: 14px; }
+.finance-pill.debt { background: var(--debt, #AB3D33); }
+.finance-pill.wish { background: var(--wish, #D0A020); }
+.finance-pill.income { background: var(--forest); }
+.finance-total { font-family: monospace; font-size: 11px; color: var(--ink-soft); margin-left: auto; }
+
+.fin-quick-add { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border: 1.5px dashed var(--rule); border-radius: 8px; margin-bottom: 14px; background: rgba(255,255,255,0.35); flex-wrap: wrap; }
+.fin-quick-add input:not([type]) { flex: 1; min-width: 90px; border: none; background: transparent; outline: none; font-size: 13.5px; }
+.fin-quick-add input[type="number"] { width: 88px; border: none; border-bottom: 1px dashed var(--rule); background: transparent; outline: none; font-size: 13.5px; font-family: monospace; }
+.fin-quick-add input[type="date"] { border: none; border-bottom: 1px dashed var(--rule); background: transparent; outline: none; font-size: 11.5px; font-family: monospace; color: var(--ink-soft); width: 130px; }
+.fin-due-field { display: flex; align-items: center; gap: 6px; color: var(--ink-faint); font-family: monospace; font-size: 10px; flex-shrink: 0; }
+.fin-quick-add button { border: none; background: var(--ink); color: #fff; border-radius: 6px; padding: 6px 14px; font-size: 12.5px; cursor: pointer; }
+
+.finance-empty { padding: 24px 4px; color: var(--ink-faint); font-size: 13px; }
+
+.ledger-list { display: flex; flex-direction: column; }
+.ledger-row { padding: 11px 2px; border-bottom: 1px dashed var(--rule); animation: ledger-row-in 0.25s cubic-bezier(.2,.8,.3,1) both; }
+@keyframes ledger-row-in { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+.ledger-row.done .ledger-title { text-decoration: line-through; color: var(--ink-faint); }
+.ledger-row.done .ledger-amount { color: var(--ink-faint); }
+.ledger-top { display: flex; align-items: center; gap: 10px; }
+.ledger-title { font-size: 14px; outline: none; flex-shrink: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ledger-title:focus { white-space: normal; overflow: visible; }
+.ledger-leader { flex: 1; border-bottom: 1px dashed var(--rule); margin: 0 4px; min-width: 14px; height: 1px; }
+.ledger-amount { font-family: monospace; font-size: 13px; white-space: nowrap; outline: none; flex-shrink: 0; }
+.ledger-del { background: none; border: none; color: var(--ink-faint); cursor: pointer; font-size: 14px; opacity: 0; transition: opacity .15s; flex-shrink: 0; }
+.ledger-row:hover .ledger-del { opacity: 1; }
+.ledger-del:hover { color: var(--urgent); }
+.ledger-due { font-family: monospace; font-size: 10px; color: var(--ink-faint); outline: none; border: none; background: transparent; flex-shrink: 0; cursor: pointer; }
+.ledger-sub { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-left: 34px; }
+.ledger-sub-label { font-size: 10px; color: var(--ink-faint); font-family: monospace; }
+.ledger-sub-input { width: 64px; border: none; border-bottom: 1px dashed var(--rule); background: transparent; outline: none; font-family: monospace; font-size: 11.5px; color: var(--ink-soft); }
+.ledger-progress-track { flex: 1; height: 5px; background: var(--rule); border-radius: 3px; overflow: hidden; }
+.ledger-progress-fill { height: 100%; }
+.stamp { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--rule); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.5); color: #fff; font-size: 12px; transition: border-color .15s, background .15s; }
+.stamp:hover { border-color: var(--forest); }
+.stamp.checked { border-color: var(--forest); background: var(--forest); }
+.income-row .income-date-label { color: var(--forest); font-family: monospace; font-size: 11px; }
+.income-row .ledger-amount { color: var(--forest); }
