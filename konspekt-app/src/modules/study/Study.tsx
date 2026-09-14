@@ -2,137 +2,132 @@ import { useState } from 'react';
 import { useStore } from '../../core/store';
 import { uid, COLOR_VARS, PALETTE, type Subject, type TopicGroup, type Topic } from '../../core/types';
 import { subjectProgress, subjectGroups, ungroupedTopics, groupTopics, filteredTopicsForSubject } from '../../core/selectors';
-import { useConfirm } from '../../ui/ConfirmDialog';
+import { useConfirm, useNamePrompt } from '../../ui/ConfirmDialog';
+import { TopBar, useCycleColor } from '../../app/TopBar';
+import { CheckStamp, FlagIcon } from '../../ui/icons';
 import { DetailDrawer } from './DetailDrawer';
 import './study.css';
 
 export function Study() {
-  const { state, update } = useStore();
-  const [search, setSearch] = useState('');
-  const [newSubjectName, setNewSubjectName] = useState<string | null>(null);
+  const { state } = useStore();
   const [openTopicId, setOpenTopicId] = useState<string | null>(null);
-  const confirm = useConfirm();
 
   const subject = state.subjects.find((s) => s.id === state.activeSubjectId) ?? null;
 
-  const selectSubject = (id: string | null) => update((draft) => { draft.activeSubjectId = id; });
-
-  const addSubject = () => {
-    const name = newSubjectName?.trim();
-    setNewSubjectName(null);
-    if (!name) return;
-    const sub: Subject = { id: uid(), name, color: PALETTE[state.subjects.length % PALETTE.length], createdAt: Date.now() };
-    update((draft) => {
-      draft.subjects.push(sub);
-      draft.activeSubjectId = sub.id;
-    });
-  };
-
-  const deleteSubject = async (sub: Subject) => {
-    const ok = await confirm({ title: 'Удалить предмет?', message: `«${sub.name}» и все его темы и группы будут удалены безвозвратно.`, confirmLabel: 'Удалить' });
-    if (!ok) return;
-    update((draft) => {
-      draft.subjects = draft.subjects.filter((s) => s.id !== sub.id);
-      draft.groups = draft.groups.filter((g) => g.subjectId !== sub.id);
-      draft.topics = draft.topics.filter((t) => t.subjectId !== sub.id);
-    });
-  };
-
-  return (
-    <div className="study-layout">
-      <aside className="study-shelf">
-        {state.subjects.map((sub) => {
-          const { done, total } = subjectProgress(state, sub.id);
-          return (
-            <div
-              key={sub.id}
-              className={'study-spine' + (sub.id === state.activeSubjectId ? ' active' : '')}
-              style={{ background: COLOR_VARS[sub.color] }}
-              onClick={() => { selectSubject(sub.id); setSearch(''); }}
-            >
-              <div className="study-spine-label">{sub.name}</div>
-              <div className="study-spine-count">{done}/{total}</div>
-            </div>
-          );
-        })}
-        {newSubjectName === null ? (
-          <button className="study-add" onClick={() => setNewSubjectName('')}>+</button>
-        ) : (
-          <input
-            className="study-add-input"
-            autoFocus
-            placeholder="Например, История"
-            value={newSubjectName}
-            onChange={(e) => setNewSubjectName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') addSubject(); if (e.key === 'Escape') setNewSubjectName(null); }}
-            onBlur={addSubject}
-          />
-        )}
-      </aside>
-
-      <main className="study-main">
-        {!subject ? (
-          <div className="study-welcome">
-            <div className="study-welcome-title">Пока пусто</div>
-            <div>Добавь первый предмет через «+» слева — например, «Математика»</div>
-          </div>
-        ) : (
-          <SubjectView subject={subject} search={search} onSearch={setSearch} onDeleteSubject={() => deleteSubject(subject)} onOpenTopic={setOpenTopicId} />
-        )}
-      </main>
-
-      {openTopicId && <DetailDrawer topicId={openTopicId} onClose={() => setOpenTopicId(null)} />}
-    </div>
-  );
-}
-
-function SubjectView({ subject, search, onSearch, onDeleteSubject, onOpenTopic }: {
-  subject: Subject; search: string; onSearch: (v: string) => void; onDeleteSubject: () => void; onOpenTopic: (id: string) => void;
-}) {
-  const { state } = useStore();
-  const { done, total } = subjectProgress(state, subject.id);
-  const searchResults = filteredTopicsForSubject(state, subject.id, search);
+  if (!subject) {
+    return (
+      <div className="content-scroll">
+        <div className="welcome">
+          <div className="display">Пока пусто</div>
+          <div>Добавь первый предмет через «+» слева — например, «Математика»</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
-      <div className="study-topbar" style={{ borderBottomColor: COLOR_VARS[subject.color] }}>
-        <div className="study-title">{subject.name}</div>
-        <div className="study-meta">
-          <span>{total > 0 ? `${done} / ${total} выучено` : 'тем пока нет'}</span>
-          <button className="study-delete" onClick={onDeleteSubject}>удалить предмет</button>
-        </div>
+      <SubjectView key={subject.id} subject={subject} onOpenTopic={setOpenTopicId} />
+      {openTopicId && <DetailDrawer topicId={openTopicId} onClose={() => setOpenTopicId(null)} />}
+    </>
+  );
+}
+
+function SubjectView({ subject, onOpenTopic }: { subject: Subject; onOpenTopic: (id: string) => void }) {
+  const { state, update } = useStore();
+  const confirm = useConfirm();
+  const cycleColor = useCycleColor();
+  const search = state.studySearch;
+  const { done, total } = subjectProgress(state, subject.id);
+  const searchResults = filteredTopicsForSubject(state, subject.id, search);
+
+  const deleteSubject = async () => {
+    const ok = await confirm({
+      title: 'Удалить предмет?',
+      message: `«${subject.name}» и все его темы и группы будут удалены безвозвратно.`,
+      confirmLabel: 'Удалить',
+    });
+    if (!ok) return;
+    update((draft) => {
+      draft.subjects = draft.subjects.filter((s) => s.id !== subject.id);
+      draft.groups = draft.groups.filter((g) => g.subjectId !== subject.id);
+      draft.topics = draft.topics.filter((t) => t.subjectId !== subject.id);
+      draft.activeSubjectId = null;
+    });
+  };
+
+  const meta = total > 0 ? (
+    <>
+      <span className="mono">{done} / {total} выучено</span>
+      <div className="progress-track">
+        {Array.from({ length: total }).map((_, i) => <div key={i} className={'tick' + (i < done ? ' filled' : '')} />)}
+      </div>
+    </>
+  ) : <span className="mono">тем пока нет</span>;
+
+  return (
+    <>
+      <TopBar
+        name={subject.name}
+        color={subject.color}
+        onRename={(name) => { if (name) update((draft) => { const s = draft.subjects.find((x) => x.id === subject.id); if (s) s.name = name; }); }}
+        onCycleColor={() => cycleColor('subject', subject.id)}
+        deleteLabel="удалить предмет"
+        deleteTitle="Удалить предмет?"
+        deleteMessage={`«${subject.name}» и все его темы и группы будут удалены безвозвратно.`}
+        onDelete={deleteSubject}
+        meta={meta}
+      />
+
+      <div className="searchbar">
+        <input
+          className="search-input"
+          placeholder="Поиск по темам и разборам..."
+          value={search}
+          onChange={(e) => update((draft) => { draft.studySearch = e.target.value; })}
+        />
       </div>
 
-      <input className="study-search" placeholder="Поиск по темам и разборам..." value={search} onChange={(e) => onSearch(e.target.value)} />
-
-      {search.trim() ? (
-        <div className="topics-list">
-          {searchResults.length === 0 && <div className="study-empty">Ничего не найдено</div>}
-          {searchResults.map((t) => {
-            const group = state.groups.find((g) => g.id === t.groupId);
-            return <TopicCard key={t.id} topic={t} accent={group ? COLOR_VARS[group.color ?? 'teal'] : COLOR_VARS[subject.color]} groupTag={group ? group.name : (subject.ungroupedName || 'Общее')} onOpen={() => onOpenTopic(t.id)} />;
-          })}
-        </div>
-      ) : (
-        <GroupedTopics subject={subject} onOpenTopic={onOpenTopic} />
-      )}
+      <div className="content-scroll">
+        {search.trim() ? (
+          searchResults.length === 0 ? (
+            <div className="empty-state"><span className="display">Ничего не найдено</span>Попробуй другой запрос</div>
+          ) : (
+            <div className="topics-list">
+              {searchResults.map((t) => {
+                const group = state.groups.find((g) => g.id === t.groupId);
+                return (
+                  <TopicCard
+                    key={t.id}
+                    topic={t}
+                    accent={group ? COLOR_VARS[group.color ?? 'teal'] : COLOR_VARS[subject.color]}
+                    groupTag={group ? group.name : (subject.ungroupedName || 'Общее')}
+                    onOpen={() => onOpenTopic(t.id)}
+                  />
+                );
+              })}
+            </div>
+          )
+        ) : (
+          <GroupedTopics subject={subject} onOpenTopic={onOpenTopic} />
+        )}
+      </div>
     </>
   );
 }
 
 function GroupedTopics({ subject, onOpenTopic }: { subject: Subject; onOpenTopic: (id: string) => void }) {
   const { state, update } = useStore();
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [newGroupName, setNewGroupName] = useState<string | null>(null);
+  const namePrompt = useNamePrompt();
   const confirm = useConfirm();
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const ungrouped = ungroupedTopics(state, subject.id);
   const groups = subjectGroups(state, subject.id);
   const ungroupedName = subject.ungroupedName || 'Общее';
 
-  const addGroup = () => {
-    const name = newGroupName?.trim();
-    setNewGroupName(null);
+  const addGroup = async () => {
+    const name = await namePrompt('Новая группа', 'Например, Геометрия');
     if (!name) return;
     const group: TopicGroup = { id: uid(), subjectId: subject.id, name, color: PALETTE[groups.length % PALETTE.length], createdAt: Date.now() };
     update((draft) => { draft.groups.push(group); });
@@ -194,18 +189,7 @@ function GroupedTopics({ subject, onOpenTopic }: { subject: Subject; onOpenTopic
       ))}
 
       <div className="add-group-row">
-        {newGroupName === null ? (
-          <button id="add-group-btn" onClick={() => setNewGroupName('')}>+ добавить группу</button>
-        ) : (
-          <input
-            autoFocus
-            placeholder="Например, Геометрия"
-            value={newGroupName}
-            onChange={(e) => setNewGroupName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') addGroup(); if (e.key === 'Escape') setNewGroupName(null); }}
-            onBlur={addGroup}
-          />
-        )}
+        <button className="add-group-btn" onClick={addGroup}>+ добавить группу</button>
       </div>
     </>
   );
@@ -230,9 +214,9 @@ function TopicGroupSection({ title, color, collapsed, onToggleCollapse, onRename
     <div className="group-section">
       <div className="group-header">
         <button className="group-collapse" onClick={onToggleCollapse}>{collapsed ? '▸' : '▾'}</button>
-        <div className="group-pill" style={{ background: color ?? '#9A9C8F' }}>
-          {onCycleColor && <div className="group-dot" onClick={onCycleColor} />}
-          <div className="group-name" contentEditable suppressContentEditableWarning onBlur={(e) => onRename(e.currentTarget.textContent?.trim() ?? '')}>{title}</div>
+        <div className={'group-pill' + (color ? '' : ' neutral')} style={color ? { background: color } : undefined}>
+          {onCycleColor && <div className="group-dot" onClick={onCycleColor} title="Сменить цвет" />}
+          <div className="group-name" contentEditable suppressContentEditableWarning spellCheck={false} onBlur={(e) => onRename(e.currentTarget.textContent?.trim() ?? '')}>{title}</div>
         </div>
         <div className="group-meta">{topics.length ? `${done}/${topics.length}` : ''}</div>
         {onDelete && <button className="group-del" onClick={onDelete}>удалить группу</button>}
@@ -274,17 +258,19 @@ function TopicCard({ topic, accent, groupTag, onOpen }: { topic: Topic; accent: 
   };
 
   return (
-    <div className={'topic-card' + (topic.done ? ' done' : '')} style={{ borderLeftColor: accent }} onClick={onOpen}>
-      <button className={'stamp' + (topic.done ? ' checked' : '')} onClick={toggleDone}>{topic.done ? '✓' : ''}</button>
-      <div className="topic-card-body">
-        <span className="topic-title">{topic.title}</span>
-        {groupTag && <span className="topic-group-tag">{groupTag}</span>}
-        <div className={'topic-note-preview' + (!previewText ? ' placeholder' : '')}>{previewText || 'Нет разбора — нажми, чтобы добавить'}</div>
-      </div>
-      <div className="topic-actions">
-        <span className="topic-open-hint">›</span>
-        <button className={'flag-btn' + (topic.urgent ? ' active' : '')} onClick={toggleUrgent}>⚑</button>
-        <button className="del-btn" onClick={remove}>×</button>
+    <div className={'card' + (topic.done ? ' done' : '')} style={{ ['--card-accent' as string]: accent }} onClick={onOpen}>
+      <div className="card-row">
+        <div className={'stamp' + (topic.done ? ' checked' : '')} onClick={toggleDone}><CheckStamp /></div>
+        <div className="card-body">
+          <span className="card-title">{topic.title}</span>
+          {groupTag && <span className="card-group-tag">{groupTag}</span>}
+          <div className={'card-note-preview' + (!previewText ? ' placeholder' : '')}>{previewText || 'Нет разбора — нажми, чтобы добавить'}</div>
+        </div>
+        <div className="card-actions">
+          <span className="card-open-hint">›</span>
+          <button className={'flag-btn' + (topic.urgent ? ' active' : '')} title="Срочно" onClick={toggleUrgent}><FlagIcon /></button>
+          <button className="del-btn" title="Удалить" onClick={remove}>×</button>
+        </div>
       </div>
     </div>
   );

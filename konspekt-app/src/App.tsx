@@ -7,8 +7,8 @@ import { Tasks } from './modules/tasks/Tasks';
 import { Finance } from './modules/finance/Finance';
 import { Today } from './modules/today/Today';
 import { Study } from './modules/study/Study';
-import { BackupBar } from './modules/BackupBar';
-import { ModeSwitch } from './app/ModeSwitch';
+import { FooterBar } from './modules/BackupBar';
+import { Shelf } from './app/Shelf';
 import { ConfirmProvider } from './ui/ConfirmDialog';
 
 function ActiveModule() {
@@ -28,7 +28,7 @@ function ActiveModule() {
 }
 
 export default function App() {
-  const { loaded, load, saveStatus } = useStore();
+  const { loaded, load } = useStore();
 
   useEffect(() => {
     load();
@@ -39,15 +39,12 @@ export default function App() {
   return (
     <ConfirmProvider>
       <div className="app-shell">
-        <ModeSwitch />
+        <Shelf />
         <div className="app-main">
           <ActiveModule />
         </div>
       </div>
-      <div style={{ position: 'fixed', bottom: 8, left: 16, fontSize: 11, fontFamily: 'monospace', color: 'var(--ink-faint)' }}>
-        {saveStatus.text}
-      </div>
-      <BackupBar />
+      <FooterBar />
     </ConfirmProvider>
   );
 }

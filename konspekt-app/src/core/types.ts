@@ -133,10 +133,12 @@ export interface AppState {
   groups: TopicGroup[];
   topics: Topic[];
   activeSubjectId: string | null;
+  studySearch: string;
 
   notePages: NotePage[];
   noteEntries: NoteEntry[];
   activeNotePageId: string | null;
+  notesSearch: string;
 
   financeItems: FinanceItem[];
   currency: string;
@@ -144,6 +146,7 @@ export interface AppState {
   plants: Plant[];
   waterings: Watering[];
   activePlantId: string | null;
+  plantsSearch: string;
 
   shoppingItems: ShoppingItem[];
   shoppingView: 'current' | 'archive';
@@ -174,14 +177,17 @@ export function createEmptyState(): AppState {
     groups: [],
     topics: [],
     activeSubjectId: null,
+    studySearch: '',
     notePages: [],
     noteEntries: [],
     activeNotePageId: null,
+    notesSearch: '',
     financeItems: [],
     currency: '₽',
     plants: [],
     waterings: [],
     activePlantId: null,
+    plantsSearch: '',
     shoppingItems: [],
     shoppingView: 'current',
     taskProjects: [],

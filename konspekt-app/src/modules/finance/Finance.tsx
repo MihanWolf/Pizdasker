@@ -3,10 +3,11 @@ import { useStore } from '../../core/store';
 import { uid, type FinanceItem, type FinanceItemType } from '../../core/types';
 import { fmtMoney, formatFinanceDate, remainingTotal, sortedFinanceItems, sortedIncomes, financeItemsTotal } from '../../core/selectors';
 import { useConfirm } from '../../ui/ConfirmDialog';
+import { CheckStamp } from '../../ui/icons';
 import './finance.css';
 
 export function Finance() {
-  const { state } = useStore();
+  const { state, update } = useStore();
   const debtLeft = remainingTotal(state, 'debt');
   const wishLeft = remainingTotal(state, 'wish');
 
@@ -14,9 +15,22 @@ export function Finance() {
     <div className="finance-wrap">
       <div className="finance-header">
         <div className="finance-title">Финансы</div>
-        <div className="finance-totals">
-          <span>Осталось оплатить <b className="debt-color">{fmtMoney(debtLeft)} {state.currency}</b></span>
-          <span>Осталось накопить <b className="wish-color">{fmtMoney(wishLeft)} {state.currency}</b></span>
+        <div className="finance-currency">
+          Валюта:
+          <span
+            contentEditable
+            suppressContentEditableWarning
+            spellCheck={false}
+            onBlur={(e) => {
+              const value = e.currentTarget.textContent?.trim() || state.currency;
+              update((draft) => { draft.currency = value; });
+            }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.currentTarget as HTMLElement).blur(); } }}
+          >
+            {state.currency}
+          </span>
+          <span style={{ marginLeft: 10 }}>Осталось оплатить: <b className="mono debt-color">{fmtMoney(debtLeft)} {state.currency}</b></span>
+          <span style={{ marginLeft: 10 }}>Осталось накопить: <b className="mono wish-color">{fmtMoney(wishLeft)} {state.currency}</b></span>
         </div>
       </div>
       <div className="finance-columns">
@@ -73,28 +87,32 @@ function DebtOrWishSection({ type }: { type: FinanceItemType & ('debt' | 'wish')
         <input placeholder={isDebt ? 'Например, кредит на телефон' : 'Например, новые наушники'} value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addItem()} />
         <input type="number" placeholder={isDebt ? 'сумма' : 'цена'} value={amount} onChange={(e) => setAmount(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addItem()} />
         {isDebt && (
-          <label className="fin-due-field"><span>срок</span><input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></label>
+          <label className="fin-due-field"><span>срок</span><input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} aria-label="Срок платежа" /></label>
         )}
         <button onClick={addItem}>Добавить</button>
       </div>
 
       <div className="ledger-list">
-        {items.length === 0 && <div className="finance-empty">{isDebt ? 'Впиши первый платёж выше' : 'Впиши первое желание выше'}</div>}
+        {items.length === 0 && (
+          <div className="empty-state"><span className="display">Пока пусто</span>{isDebt ? 'Впиши первый платёж выше' : 'Впиши первое желание выше'}</div>
+        )}
         {items.map((item) => {
           const amt = Number(item.amount) || 0;
           const progress = Number(item.progress) || 0;
           const pct = amt > 0 ? Math.min(100, Math.round((progress / amt) * 100)) : 0;
           return (
-            <div key={item.id} className={'ledger-row' + (item.done ? ' done' : '')}>
+            <div key={item.id} className={'ledger-row' + (item.done ? ' done' : '')} data-type={type}>
               <div className="ledger-top">
-                <button className={'stamp' + (item.done ? ' checked' : '')} onClick={() => patch(item.id, (i) => { i.done = !i.done; })}>
-                  {item.done ? '✓' : ''}
-                </button>
+                <div className={'stamp' + (item.done ? ' checked' : '')} title={isDebt ? 'Оплачено' : 'Куплено'} onClick={() => patch(item.id, (i) => { i.done = !i.done; })}>
+                  <CheckStamp />
+                </div>
                 <span
                   className="ledger-title"
                   contentEditable
                   suppressContentEditableWarning
+                  spellCheck={false}
                   onBlur={(e) => patch(item.id, (i) => { i.title = e.currentTarget.textContent?.trim() || i.title; })}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.currentTarget as HTMLElement).blur(); } }}
                 >
                   {item.title}
                 </span>
@@ -106,14 +124,16 @@ function DebtOrWishSection({ type }: { type: FinanceItemType & ('debt' | 'wish')
                   className="ledger-amount"
                   contentEditable
                   suppressContentEditableWarning
+                  spellCheck={false}
                   onBlur={(e) => {
                     const raw = (e.currentTarget.textContent || '').replace(state.currency, '').replace(/[^\d.,-]/g, '').replace(',', '.');
                     patch(item.id, (i) => { i.amount = Number(raw) || 0; });
                   }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.currentTarget as HTMLElement).blur(); } }}
                 >
                   {fmtMoney(amt)} {state.currency}
                 </span>
-                <button className="ledger-del" onClick={() => remove(item)}>×</button>
+                <button className="ledger-del" title="Удалить" onClick={() => remove(item)}>×</button>
               </div>
               {!item.done && (
                 <div className="ledger-sub">
@@ -121,11 +141,11 @@ function DebtOrWishSection({ type }: { type: FinanceItemType & ('debt' | 'wish')
                   <input
                     type="number"
                     className="ledger-sub-input"
-                    defaultValue={progress || ''}
+                    value={progress || ''}
                     placeholder="0"
-                    onBlur={(e) => patch(item.id, (i) => { i.progress = Number(e.target.value) || 0; })}
+                    onChange={(e) => patch(item.id, (i) => { i.progress = Number(e.target.value) || 0; })}
                   />
-                  <div className="ledger-progress-track"><div className="ledger-progress-fill" style={{ width: `${pct}%`, background: isDebt ? 'var(--debt)' : 'var(--wish)' }} /></div>
+                  <div className="ledger-progress-track"><div className="ledger-progress-fill" style={{ width: `${pct}%` }} /></div>
                   <span className="ledger-sub-label">{pct}%</span>
                 </div>
               )}
@@ -167,13 +187,13 @@ function IncomeSection() {
       </div>
 
       <div className="fin-quick-add income-quick-add">
-        <label className="fin-due-field"><span>дата</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+        <label className="fin-due-field"><span>дата</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Дата поступления" /></label>
         <input type="number" placeholder="сумма" value={amount} onChange={(e) => setAmount(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addIncome()} />
         <button onClick={addIncome}>Добавить</button>
       </div>
 
       <div className="ledger-list">
-        {incomes.length === 0 && <div className="finance-empty">Добавь первое поступление выше</div>}
+        {incomes.length === 0 && <div className="empty-state"><span className="display">Пока пусто</span>Добавь первое поступление выше</div>}
         {incomes.map((item) => (
           <div key={item.id} className="ledger-row income-row">
             <div className="ledger-top">
@@ -183,6 +203,7 @@ function IncomeSection() {
                 className="ledger-amount"
                 contentEditable
                 suppressContentEditableWarning
+                spellCheck={false}
                 onBlur={(e) => {
                   const raw = (e.currentTarget.textContent || '').replace(state.currency, '').replace(/[^\d.,-]/g, '').replace(',', '.');
                   update((draft) => {
@@ -190,10 +211,11 @@ function IncomeSection() {
                     if (i) i.amount = Number(raw) || 0;
                   });
                 }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.currentTarget as HTMLElement).blur(); } }}
               >
                 {fmtMoney(Number(item.amount) || 0)} {state.currency}
               </span>
-              <button className="ledger-del" onClick={() => remove(item)}>×</button>
+              <button className="ledger-del" title="Удалить" onClick={() => remove(item)}>×</button>
             </div>
           </div>
         ))}

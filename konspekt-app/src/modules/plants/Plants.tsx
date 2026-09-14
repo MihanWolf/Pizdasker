@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useStore } from '../../core/store';
-import { uid, COLOR_VARS, PALETTE, type Plant, type Watering, type FertAmounts } from '../../core/types';
-import { filteredWateringsForPlant, daysAgoLabel, todayStr } from '../../core/selectors';
+import { uid, COLOR_VARS, type Plant, type Watering, type FertAmounts } from '../../core/types';
+import { filteredWateringsForPlant, daysAgoLabel, todayStr, latestWateringDate } from '../../core/selectors';
 import { useConfirm } from '../../ui/ConfirmDialog';
+import { TopBar, useCycleColor } from '../../app/TopBar';
+import { DropletIcon } from '../../ui/icons';
 import './plants.css';
 
 const FERT_KEYS: [keyof FertAmounts, string][] = [
@@ -13,27 +15,33 @@ const FERT_KEYS: [keyof FertAmounts, string][] = [
 ];
 
 export function Plants() {
-  const { state, update } = useStore();
-  const [search, setSearch] = useState('');
-  const [newPlantName, setNewPlantName] = useState<string | null>(null);
-  const confirm = useConfirm();
-
+  const { state } = useStore();
   const activePlant = state.plants.find((p) => p.id === state.activePlantId) ?? null;
 
-  const selectPlant = (id: string | null) => update((draft) => { draft.activePlantId = id; });
+  if (!activePlant) {
+    return (
+      <div className="content-scroll">
+        <div className="welcome">
+          <div className="display">Пока пусто</div>
+          <div>Добавь первое растение через «+» слева — например, «Монстера»</div>
+        </div>
+      </div>
+    );
+  }
 
-  const addPlant = () => {
-    const name = newPlantName?.trim();
-    setNewPlantName(null);
-    if (!name) return;
-    const plant: Plant = { id: uid(), name, color: PALETTE[state.plants.length % PALETTE.length], createdAt: Date.now() };
-    update((draft) => {
-      draft.plants.push(plant);
-      draft.activePlantId = plant.id;
-    });
-  };
+  return <PlantView key={activePlant.id} plant={activePlant} />;
+}
 
-  const deletePlant = async (plant: Plant) => {
+function PlantView({ plant }: { plant: Plant }) {
+  const { state, update } = useStore();
+  const confirm = useConfirm();
+  const cycleColor = useCycleColor();
+
+  const search = state.plantsSearch;
+  const entries = filteredWateringsForPlant(state, plant.id, search);
+  const lastDate = latestWateringDate(state, plant.id);
+
+  const deletePlant = async () => {
     const ok = await confirm({
       title: 'Удалить растение?',
       message: `«${plant.name}» и весь его журнал поливов будут удалены безвозвратно.`,
@@ -43,92 +51,45 @@ export function Plants() {
     update((draft) => {
       draft.plants = draft.plants.filter((p) => p.id !== plant.id);
       draft.waterings = draft.waterings.filter((w) => w.plantId !== plant.id);
-    });
-  };
-
-  return (
-    <div className="plants-layout">
-      <aside className="plants-shelf">
-        {state.plants.map((plant) => {
-          const count = state.waterings.filter((w) => w.plantId === plant.id).length;
-          return (
-            <div
-              key={plant.id}
-              className={'plants-spine' + (plant.id === state.activePlantId ? ' active' : '')}
-              style={{ background: COLOR_VARS[plant.color] }}
-              onClick={() => { selectPlant(plant.id); setSearch(''); }}
-            >
-              <div className="plants-spine-label">{plant.name}</div>
-              <div className="plants-spine-count">{count}</div>
-            </div>
-          );
-        })}
-        {newPlantName === null ? (
-          <button className="plants-add" onClick={() => setNewPlantName('')}>+</button>
-        ) : (
-          <input
-            className="plants-add-input"
-            autoFocus
-            placeholder="Например, Монстера"
-            value={newPlantName}
-            onChange={(e) => setNewPlantName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') addPlant(); if (e.key === 'Escape') setNewPlantName(null); }}
-            onBlur={addPlant}
-          />
-        )}
-      </aside>
-
-      <main className="plants-main">
-        {!activePlant ? (
-          <div className="plants-welcome">
-            <div className="plants-welcome-title">Пока пусто</div>
-            <div>Добавь первое растение через «+» слева — например, «Монстера»</div>
-          </div>
-        ) : (
-          <PlantView plant={activePlant} search={search} onSearch={setSearch} onDelete={() => deletePlant(activePlant)} />
-        )}
-      </main>
-    </div>
-  );
-}
-
-function PlantView({ plant, search, onSearch, onDelete }: { plant: Plant; search: string; onSearch: (v: string) => void; onDelete: () => void }) {
-  const { state, update } = useStore();
-  const confirm = useConfirm();
-  const entries = filteredWateringsForPlant(state, plant.id, search);
-  const last = filteredWateringsForPlant(state, plant.id, '')[0];
-
-  const deleteEntry = async (id: string) => {
-    const ok = await confirm({ title: 'Удалить запись полива?', message: 'Эта запись будет удалена безвозвратно.', confirmLabel: 'Удалить' });
-    if (ok) update((draft) => { draft.waterings = draft.waterings.filter((w) => w.id !== id); });
-  };
-
-  const patchEntry = (id: string, patch: Partial<Watering>) => {
-    update((draft) => {
-      const entry = draft.waterings.find((w) => w.id === id);
-      if (entry) Object.assign(entry, patch);
+      draft.activePlantId = null;
     });
   };
 
   return (
     <>
-      <div className="plants-topbar" style={{ borderBottomColor: COLOR_VARS[plant.color] }}>
-        <div className="plants-title">{plant.name}</div>
-        <div className="plants-meta">
-          <span>{last ? `Последний полив: ${daysAgoLabel(last.date)}` : 'поливов пока нет'}</span>
-          <button className="plants-delete" onClick={onDelete}>удалить растение</button>
-        </div>
+      <TopBar
+        name={plant.name}
+        color={plant.color}
+        onRename={(name) => { if (name) update((draft) => { const p = draft.plants.find((x) => x.id === plant.id); if (p) p.name = name; }); }}
+        onCycleColor={() => cycleColor('plant', plant.id)}
+        deleteLabel="удалить растение"
+        deleteTitle="Удалить растение?"
+        deleteMessage={`«${plant.name}» и весь его журнал поливов будут удалены безвозвратно.`}
+        onDelete={deletePlant}
+        meta={lastDate ? <div className="plant-last-watered"><DropletIcon />Последний полив: {daysAgoLabel(lastDate)}</div> : <span className="mono">поливов пока нет</span>}
+      />
+
+      <div className="searchbar">
+        <input
+          className="search-input"
+          placeholder="Поиск по журналу..."
+          value={search}
+          onChange={(e) => update((draft) => { draft.plantsSearch = e.target.value; })}
+        />
       </div>
 
-      <input className="plants-search" placeholder="Поиск по журналу..." value={search} onChange={(e) => onSearch(e.target.value)} />
-
-      {!search && <QuickAddWatering plantId={plant.id} />}
-
-      <div className="waterings-list">
-        {entries.length === 0 && <div className="plants-empty">{search ? 'Ничего не найдено' : 'Впиши дату и объём воды выше'}</div>}
-        {entries.map((entry) => (
-          <WateringRow key={entry.id} entry={entry} accent={COLOR_VARS[plant.color]} onPatch={(patch) => patchEntry(entry.id, patch)} onDelete={() => deleteEntry(entry.id)} />
-        ))}
+      <div className="content-scroll">
+        {!search && <QuickAddWatering plantId={plant.id} />}
+        {entries.length === 0 ? (
+          <div className="empty-state">
+            <span className="display">{search ? 'Ничего не найдено' : 'Пока пусто'}</span>
+            {search ? 'Попробуй другой запрос' : 'Впиши дату и объём воды выше'}
+          </div>
+        ) : (
+          <div className="waterings-list">
+            {entries.map((entry) => <WateringRow key={entry.id} entry={entry} plant={plant} />)}
+          </div>
+        )}
       </div>
     </>
   );
@@ -176,28 +137,40 @@ function QuickAddWatering({ plantId }: { plantId: string }) {
           </div>
         ))}
       </div>
-      <input placeholder="Заметка" value={note} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
+      <input type="text" placeholder="Заметка" value={note} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
       <button onClick={submit}>Добавить</button>
     </div>
   );
 }
 
-function WateringRow({ entry, accent, onPatch, onDelete }: { entry: Watering; accent: string; onPatch: (patch: Partial<Watering>) => void; onDelete: () => void }) {
+function WateringRow({ entry, plant }: { entry: Watering; plant: Plant }) {
+  const { update } = useStore();
+  const confirm = useConfirm();
   const [fertExpanded, setFertExpanded] = useState(FERT_KEYS.some(([key]) => entry.fert[key]));
   const dateLabel = entry.date ? new Date(entry.date + 'T00:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 
+  const patch = (p: Partial<Watering>) => {
+    update((draft) => { const w = draft.waterings.find((x) => x.id === entry.id); if (w) Object.assign(w, p); });
+  };
+
+  const remove = async () => {
+    const ok = await confirm({ title: 'Удалить запись полива?', message: 'Эта запись будет удалена безвозвратно.', confirmLabel: 'Удалить' });
+    if (ok) update((draft) => { draft.waterings = draft.waterings.filter((w) => w.id !== entry.id); });
+  };
+
   return (
-    <div className="watering-row watering-row-enter" style={{ borderLeftColor: accent }} title={dateLabel}>
+    <div className="watering-row watering-row-enter" style={{ ['--card-accent' as string]: COLOR_VARS[plant.color] }} title={dateLabel}>
       <div className="watering-top">
-        <input type="date" className="watering-date" value={entry.date} onChange={(e) => onPatch({ date: e.target.value })} />
+        <input type="date" className="watering-date" value={entry.date} onChange={(e) => patch({ date: e.target.value })} />
         <span
           className="watering-pill"
           contentEditable
           suppressContentEditableWarning
+          spellCheck={false}
           data-placeholder="+ вода"
           onBlur={(e) => {
             const raw = (e.currentTarget.textContent || '').replace(/[^\d.,]/g, '').replace(',', '.');
-            onPatch({ water: raw ? Number(raw) : null });
+            patch({ water: raw ? Number(raw) : null });
           }}
         >
           {entry.water != null ? `${entry.water} л` : ''}
@@ -206,15 +179,16 @@ function WateringRow({ entry, accent, onPatch, onDelete }: { entry: Watering; ac
           className="watering-pill ph"
           contentEditable
           suppressContentEditableWarning
+          spellCheck={false}
           data-placeholder="+ pH"
           onBlur={(e) => {
             const raw = (e.currentTarget.textContent || '').replace(/[^\d.,]/g, '').replace(',', '.');
-            onPatch({ ph: raw ? Number(raw) : null });
+            patch({ ph: raw ? Number(raw) : null });
           }}
         >
           {entry.ph != null ? `pH ${entry.ph}` : ''}
         </span>
-        <button className="watering-del" onClick={onDelete}>×</button>
+        <button className="watering-del" title="Удалить" onClick={remove}>×</button>
       </div>
 
       <div className="fert-line">
@@ -228,8 +202,8 @@ function WateringRow({ entry, accent, onPatch, onDelete }: { entry: Watering; ac
                 <input
                   type="number"
                   step="0.1"
-                  defaultValue={entry.fert[key] != null ? String(entry.fert[key]) : ''}
-                  onBlur={(e) => onPatch({ fert: { ...entry.fert, [key]: e.target.value ? Number(e.target.value) : null } })}
+                  value={entry.fert[key] != null ? String(entry.fert[key]) : ''}
+                  onChange={(e) => patch({ fert: { ...entry.fert, [key]: e.target.value ? Number(e.target.value) : null } })}
                 />
               </div>
             ))}
@@ -241,8 +215,9 @@ function WateringRow({ entry, accent, onPatch, onDelete }: { entry: Watering; ac
         className="watering-note"
         contentEditable
         suppressContentEditableWarning
+        spellCheck={false}
         data-placeholder="Заметка"
-        onBlur={(e) => onPatch({ note: e.currentTarget.textContent?.trim() ?? '' })}
+        onBlur={(e) => patch({ note: e.currentTarget.textContent?.trim() ?? '' })}
       >
         {entry.note}
       </div>

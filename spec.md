@@ -102,13 +102,14 @@ app/ ui/   — клей: навигация, диалоги, общие комп
 | `src/core/selectors.test.ts` | Тесты селекторов (Vitest) |
 | `src/core/backup.ts` | `exportBackup()` / `importBackup()` |
 | `src/core/backup.test.ts` | Тесты совместимости бэкапов |
-| `src/app/ModeSwitch.tsx` | Вертикальная полка вкладок (навигация) |
-| `src/app/sidebar.css` | Стили полки вкладок |
-| `src/ui/ConfirmDialog.tsx` | `ConfirmProvider` + хук `useConfirm()` |
-| `src/ui/confirm-dialog.css` | Стили диалога подтверждения |
+| `src/app/Shelf.tsx` | Единая полка: иконки режимов + корешки активного раздела + «+» |
+| `src/app/TopBar.tsx` | Общая шапка раздела: цветная точка, inline-имя, мета, удаление |
+| `src/ui/icons.tsx` | Inline-SVG иконки (режимы, флаг, штамп-галочка) |
+| `src/ui/ConfirmDialog.tsx` | `ConfirmProvider` + хуки `useConfirm()`, `useNamePrompt()` |
+| `src/ui/confirm-dialog.css` | Стили диалогов подтверждения и ввода имени |
 | `src/modules/<name>/<Name>.tsx` | Компонент раздела |
 | `src/modules/<name>/<name>.css` | Стили раздела |
-| `src/modules/BackupBar.tsx` | Фиксированные кнопки экспорта/импорта |
+| `src/modules/BackupBar.tsx` | Нижняя панель: индикатор сохранения + экспорт/импорт/очистка |
 | `src/modules/study/DetailDrawer.tsx` | Боковая панель деталей темы |
 
 ---
@@ -200,10 +201,12 @@ interface AppState {
   groups: TopicGroup[];
   topics: Topic[];
   activeSubjectId: string | null;
+  studySearch: string;                    // поле поиска раздела «Учёба»
 
   notePages: NotePage[];
   noteEntries: NoteEntry[];
   activeNotePageId: string | null;
+  notesSearch: string;                    // поле поиска раздела «Заметки»
 
   financeItems: FinanceItem[];
   currency: string;                       // по умолчанию '₽'
@@ -211,6 +214,7 @@ interface AppState {
   plants: Plant[];
   waterings: Watering[];
   activePlantId: string | null;
+  plantsSearch: string;                   // поле поиска раздела «Полив»
 
   shoppingItems: ShoppingItem[];
   shoppingView: 'current' | 'archive';
@@ -361,10 +365,11 @@ interface Store {
 
 ```
 <ConfirmProvider>
-  <ModeSwitch />                 — фиксированная полка слева
-  <div flex:1 scroll> <ActiveModule /> </div>
-  <statusLine fixed bottom-left> saveStatus.text
-  <BackupBar />                  — fixed bottom-right
+  <div class="app-shell">
+    <Shelf />                    — фиксированная полка слева
+    <div class="app-main"> <ActiveModule /> </div>
+  </div>
+  <FooterBar />                  — фиксированная нижняя панель
 </ConfirmProvider>
 ```
 
@@ -373,23 +378,34 @@ interface Store {
   либо заглушку «раздел ещё не перенесён».
 - Фон/цвета — из `index.css` (`--ink-faint` и т.п.).
 
-### 7.2. `ModeSwitch.tsx`
+### 7.2. `Shelf.tsx` + `TopBar.tsx`
 
-Массив `MODE_LABELS` — порядок кнопок:
+**`Shelf.tsx`** — единая полка (аналог `#shelf` из старой версии):
 
-```ts
-today → tasks → finance → shopping → notes → plants → study
-```
+- Сверху вертикальный `mode-switch` с иконками: `today → tasks → finance →
+  shopping → notes → plants → study` (порядок как в старом `renderShelf()`).
+- Разделитель `.shelf-divider`.
+- Ниже — «корешки» активного раздела: для `study`/`notes`/`plants`
+  отрисовываются списки (`spine` с названием вертикально и счётчиком) и
+  кнопка «+». Для `finance`/`shopping`/`tasks` корешков нет — навигация
+  внутри основной области.
+- «+» открывает общий диалог ввода имени (`useNamePrompt`), а не инлайн-поле.
 
-Каждая кнопка: активная подсвечивается классом `.active`; флаг `ready`
-управляет `disabled`/`.pending`. Клик → `update(draft => { draft.mode = mode })`.
+**`TopBar.tsx`** — общая шапка раздела, вынесена **вне** области скролла:
+
+- Цветная точка (`subject-dot`) — клик меняет цвет (`useCycleColor`).
+- Название (`subject-title`) — `contentEditable`, inline-переименование.
+- Справа: мета (`subject-progress`) и кнопка удаления (`delete-subject`),
+  вызывающая `useConfirm`.
+- Используется в `Notes`, `Plants`, `Study`.
 
 ### 7.3. `ConfirmDialog.tsx`
 
-- `ConfirmProvider` держит `pending: PendingConfirm | null` и отдаёт через
-  Context функцию `confirm(options) => Promise<boolean>`.
-- `useConfirm()` бросает ошибку вне провайдера.
-- Диалог: оверлей + бокс, кнопки «Отмена» / `confirmLabel`.
+- `ConfirmProvider` держит `pending` (подтверждение) и `prompt` (ввод имени),
+  отдаёт через Context `confirm(options) => Promise<boolean>` и
+  `namePrompt(title, placeholder) => Promise<string | null>`.
+- `useConfirm()` / `useNamePrompt()` бросают ошибку вне провайдера.
+- Оба диалога используют стиль `.name-editor` из старой версии.
 
 ---
 
@@ -414,50 +430,54 @@ today → tasks → finance → shopping → notes → plants → study
 
 ### 8.2. Заметки — `Notes.tsx`
 
-- Левая полка «корешков» страниц (`notePages`), вертикальный текст, счётчик
-  записей; добавление через «+» (инлайн-инпут).
+- Полка «корешков» страниц вынесена в общий `Shelf` (вертикальный текст,
+  счётчик записей); добавление через «+» (`useNamePrompt`).
 - Активная страница — `state.activeNotePageId` (персистентно, переживает F5).
-- Основная область: заголовок, поиск, форма быстрого добавления
-  (Ctrl+Enter), список карточек-цитат.
+- `TopBar` с названием/цветом/удалением — вне скролла; ниже строка поиска
+  (`state.notesSearch`).
+- Основная область: форма быстрого добавления (Ctrl+Enter, textarea с
+  авто-высотой), список карточек-цитат.
 - Карточки редактируются inline через `contentEditable` (`onBlur` →
   `update`), флаг важности (`important`) и удаление с подтверждением.
 - Удаление страницы удаляет все её записи.
 
 ### 8.3. Финансы — `Finance.tsx`
 
-Три колонки: **Обязательные платежи** (`debt`), **Доходы** (`income`),
-**Желаемое** (`wish`).
+Три колонки в порядке старой версии: **Обязательные платежи** (`debt`),
+**Желаемое** (`wish`), **Доходы** (`income`).
 
-- Заголовок: «Осталось оплатить» и «Осталось накопить» (`remainingTotal`).
+- Заголовок: редактируемая валюта (`contentEditable`, `state.currency`),
+  «Осталось оплатить» и «Осталось накопить» (`remainingTotal`).
 - Дебеты/желания: быстрое добавление (название, сумма, для долга — срок),
   строка ledger с inline-редактированием суммы/названия, поле «оплачено/
-  накоплено» и прогресс-бар, чекбокс закрытия.
+  накоплено» и прогресс-бар, штамп закрытия (SVG).
 - Доходы: дата + сумма; строки сортируются по дате поступления.
-- Валюта берётся из `state.currency`.
+- Пустые колонки — `.empty-state` с заголовком `.display`.
 
 ### 8.4. Покупки — `Shopping.tsx`
 
 Две вкладки: **Нужно купить** и **Архив** (`state.shoppingView` —
-персистентно). Быстрое добавление (название +
+персистентно). Заголовок с кикером (`BagIcon`). Быстрое добавление (название +
 кол-во), чекбокс «куплено» (`purchasedAt`), удаление. Склонение счётчика
-через локальный `countLabel`.
+через локальный `countLabel`. Архив группируется по датам покупки
+(`ArchiveGroups`), с датой в строке.
 
 ### 8.5. Полив — `Plants.tsx`
 
-- Полка растений (корешки) + активное растение (`state.activePlantId`,
-  персистентно).
-- Верхняя строка: последний полив (`daysAgoLabel`), удаление растения
-  (каскадно удаляет `waterings`).
+- Полка растений вынесена в общий `Shelf` + активное растение
+  (`state.activePlantId`, персистентно).
+- `TopBar`: последний полив (`daysAgoLabel` с иконкой-каплей), удаление
+  растения (каскадно удаляет `waterings`).
 - Быстрое добавление полива: дата, вода (л), pH, удобрения TriPart
   (Micro/Grow/Bloom/Ripen), заметка.
 - Строка полива: inline-редактирование даты/воды/pH, разворачиваемые
   удобрения, заметка, удаление.
-- Поиск по журналу.
+- Поиск по журналу (`state.plantsSearch`).
 
 ### 8.6. Задачи — `Tasks.tsx`
 
-- Вкладки проектов (`taskProjects`) + «+ проект».
-- Заголовок: прогресс `done / total`.
+- Вкладки проектов (`taskProjects`) + «+ проект» (через `useNamePrompt`).
+- Заголовок с кикером (`ChecklistIcon`): прогресс `done / total`.
 - Внутри проекта: форма добавления шага с флагом «важно», фильтры
   **Открытые / Готовые**, список с чекбоксом, флагом важности, удалением.
 - Активный проект — `state.activeTaskProjectId`, фильтр — `state.tasksView`
@@ -465,17 +485,19 @@ today → tasks → finance → shopping → notes → plants → study
 
 ### 8.7. Учёба — `Study.tsx` + `DetailDrawer.tsx`
 
-- Полка предметов (`subjects`) с прогрессом `done/total`.
-- Внутри предмета: поиск (по темам и разборам), группы тем
-  (`TopicGroupSection`), секция «Общее» (ungrouped, переименовывается через
-  `subject.ungroupedName`), быстрое добавление тем, сворачивание групп,
-  перекрашивание групп, удаление группы (темы переезжают в «Общее»).
-- Карточка темы: чекбокс «выучено», флаг срочности, превью разбора, клик
-  открывает `DetailDrawer`.
+- Полка предметов вынесена в общий `Shelf` с прогрессом `done/total`.
+- `TopBar`: прогресс-полоска `.tick` (`subjectProgress`), удаление предмета.
+- Внутри предмета: поиск (`state.studySearch`), группы тем
+  (`TopicGroupSection`) в виде `.group-pill`, секция «Общее» (ungrouped,
+  переименовывается через `subject.ungroupedName`), быстрое добавление тем,
+  сворачивание групп, перекрашивание групп, удаление группы (темы переезжают
+  в «Общее»).
+- Карточка темы (`.card`): SVG-штамп «выучено», флаг срочности (иконка),
+  превью разбора, клик открывает `DetailDrawer`.
 - **DetailDrawer**: breadcrumb, inline-редактирование заголовка, статусы
-  «Выучено»/«Срочно», поля «Зачем это нужно» и «Разбор и материал», список
-  ссылок (нормализация URL до `https://`), добавление/удаление ссылок,
-  удаление темы.
+  «Выучено»/«Срочно» (с SVG-иконками), поля «Зачем это нужно» и «Разбор и
+  материал», список ссылок (нормализация URL до `https://`),
+  добавление/удаление ссылок, удаление темы.
 
 ---
 
@@ -492,9 +514,11 @@ today → tasks → finance → shopping → notes → plants → study
   - иначе — `{ active: false, scene: 'done' }` (импорт = данные уже есть);
   - если `onboarding` отсутствует **и** пользовательских данных нет —
     `{ active: true, scene: 'birth' }`.
-- `BackupBar.tsx` — fixed-кнопки внизу справа:
+- `BackupBar.tsx` (`FooterBar`) — fixed-панель внизу:
+  - слева индикатор сохранения (`saveStatus`) + «повторить» при ошибке;
   - **экспорт** → Blob + `<a download="konspekt-backup-YYYY-MM-DD.json">`;
-  - **импорт** → FileReader + `window.confirm` о необратимости + `importState`.
+  - **импорт** → FileReader + `useConfirm` о необратимости + `importState`;
+  - **очистить все данные** → `useConfirm` + `importState(createEmptyState())`.
 
 ### 9.1. Тесты (`backup.test.ts`)
 
@@ -510,17 +534,15 @@ today → tasks → finance → shopping → notes → plants → study
 
 Документ описывает **целевую** архитектуру, которой в коде ещё нет:
 
-- Файла `src/app/Sidebar.tsx` нет — есть `src/app/ModeSwitch.tsx` без иконок.
-- Файла `src/ui/icons.tsx` нет.
-- Функции `useSpineConfig()` нет; «корешки» (shelf) рисуются внутри
-  каждого модуля (`Notes`, `Plants`, `Tasks`, `Study`), а не в общем Sidebar.
+- Файла `src/app/Sidebar.tsx` нет как отдельного имени, но его роль теперь
+  выполняет `src/app/Shelf.tsx` (иконки режимов + корешки, с `src/ui/icons.tsx`).
+- Функции `useSpineConfig()` нет; «корешки» (shelf) централизованы в `Shelf.tsx`.
 - Тип `AppMode` в `types.ts` — **без** `'habits'`.
 - В `App.tsx` нет ветки `habits`.
 - Режим `onboarding` в React не реализован.
 
 > `withActiveIdFallbacks()` и правило «активное — в `AppState`» **уже
-> реализованы** (см. §10.2). Это единственное расхождение из списка,
-> которое устранено.
+> реализованы** (см. §10.2).
 
 ### 10.2. Активный элемент хранится в `AppState` ✅
 
@@ -548,13 +570,30 @@ today → tasks → finance → shopping → notes → plants → study
 
 ### 10.3. Прочее
 
-- `--debt` / `--wish` используются через fallback (`var(--debt, #AB3D33)`),
-  но в `index.css` не объявлены (есть в старом `styles.css`).
+- `--debt` / `--wish` объявлены в `index.css` наравне со старым `styles.css`.
 - `sw.js` / `manifest.json` в React-версии отсутствуют (PWA не вынесен).
 - Шрифты `Inter`, `Fraunces`, `JetBrains Mono` нигде не подключаются —
   используются имена без загрузки (наследие от старой версии).
 - Линтер `oxlint` в скрипте `lint`, но тесты запускаются только отдельной
   командой `npx vitest run`.
+
+### 10.4. Дизайн-паритет со старой версией ✅
+
+Вёрстка React-версии приведена к vanilla-версии (`Old Version/AppLastVer`):
+
+- Единая полка `Shelf` с иконками режимов и корешками (как `#shelf`).
+- Заголовки разделов вынесены в `TopBar` **вне** скролла: цветная точка со
+  сменой цвета, inline-переименование, мета, кнопка удаления.
+- Карточки тем (`Study`) — старый `.card` со «штампом» (SVG с анимацией),
+  группами-«таблетками», флагом-иконкой.
+- Quote-карточки заметок, ledger-строки финансов, watering-строки — стили
+  и разметка как в `styles.css`.
+- Финансы: порядок колонок «Обязательные / Желаемое / Доходы», редактируемое
+  поле валюты.
+- Покупки: кикер с иконкой, группировка архива по датам покупки.
+- Диалоги и ввод имени — общий стиль `.name-editor` (как `openNamePrompt`).
+- Общие стили (`stamp`, `card`, `group-pill`, `empty-state`, `welcome`,
+  `spine`) живут в `src/index.css`.
 
 ---
 
@@ -583,8 +622,8 @@ npm run dev        # ручная проверка
 3. Чистую логику — в `selectors.ts` + тест в `selectors.test.ts`.
 4. Создать `modules/<name>/<Name>.tsx` + `<name>.css` с префиксом классов.
 5. Обновить `importBackup()` в `backup.ts`.
-6. Зарегистрировать в `ActiveModule()` в `App.tsx` и в `MODE_LABELS` в
-   `ModeSwitch.tsx`.
+6. Зарегистрировать в `ActiveModule()` в `App.tsx` и в `MODE_BUTTONS` в
+   `Shelf.tsx`.
 7. Прогнать `npm run build` и `npx vitest run` **до** дальнейших правок.
 
 ---

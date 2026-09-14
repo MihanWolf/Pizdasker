@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { useStore } from '../../core/store';
 import { uid, PALETTE, type TaskProject } from '../../core/types';
 import { taskOpenCount, taskProjectItems, filteredTasksForProject } from '../../core/selectors';
-import { useConfirm } from '../../ui/ConfirmDialog';
+import { useConfirm, useNamePrompt } from '../../ui/ConfirmDialog';
+import { ChecklistIcon } from '../../ui/icons';
 import './tasks.css';
 
 export function Tasks() {
   const { state, update } = useStore();
-  const [newProjectName, setNewProjectName] = useState<string | null>(null);
-  const confirm = useConfirm();
+  const namePrompt = useNamePrompt();
 
   const project = state.taskProjects.find((p) => p.id === state.activeTaskProjectId) ?? null;
   const projectItems = project ? taskProjectItems(state, project.id) : [];
@@ -19,9 +19,8 @@ export function Tasks() {
     draft.tasksView = 'current';
   });
 
-  const addProject = () => {
-    const name = newProjectName?.trim();
-    setNewProjectName(null);
+  const addProject = async () => {
+    const name = await namePrompt('Новый проект', 'Например, Дом');
     if (!name) return;
     const proj: TaskProject = { id: uid(), name, color: PALETTE[state.taskProjects.length % PALETTE.length], createdAt: Date.now() };
     update((draft) => {
@@ -31,28 +30,17 @@ export function Tasks() {
     });
   };
 
-  const deleteProject = async () => {
-    if (!project) return;
-    const ok = await confirm({
-      title: 'Удалить проект?',
-      message: `«${project.name}» и все его шаги будут удалены безвозвратно.`,
-      confirmLabel: 'Удалить',
-    });
-    if (!ok) return;
-    update((draft) => {
-      draft.taskProjects = draft.taskProjects.filter((p) => p.id !== project.id);
-      draft.taskItems = draft.taskItems.filter((t) => t.projectId !== project.id);
-    });
-  };
-
   return (
-    <div className="tasks-wrap">
+    <div className="tasks-wrap content-scroll">
       <div className="tasks-header">
-        <h1 className="tasks-title">Задачи</h1>
+        <div>
+          <div className="tasks-kicker"><ChecklistIcon /> проекты и шаги</div>
+          <h1 className="tasks-title display">Задачи</h1>
+        </div>
         <div className="tasks-summary">{doneCount} / {projectItems.length} выполнено</div>
       </div>
 
-      <div className="task-tabs">
+      <div className="task-tabs" role="tablist">
         {state.taskProjects.map((p) => {
           const count = taskOpenCount(state, p.id);
           return (
@@ -65,35 +53,24 @@ export function Tasks() {
             </button>
           );
         })}
-        {newProjectName === null ? (
-          <button className="task-tab task-tab-add" onClick={() => setNewProjectName('')}>+ проект</button>
-        ) : (
-          <input
-            className="task-tab-add-input"
-            autoFocus
-            placeholder="Например, Дом"
-            value={newProjectName}
-            onChange={(e) => setNewProjectName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') addProject(); if (e.key === 'Escape') setNewProjectName(null); }}
-            onBlur={addProject}
-          />
-        )}
+        <button className="task-tab task-tab-add" onClick={addProject}>+ проект</button>
       </div>
 
       {!project ? (
         <div className="task-empty">
-          <span className="task-empty-title">Начни с проекта</span>
+          <span className="display">Начни с проекта</span>
           Создай вкладку «Дом», «Работа» или «Личное», а потом добавь в неё шаги.
         </div>
       ) : (
-        <ProjectView project={project} onDeleteProject={deleteProject} />
+        <ProjectView project={project} />
       )}
     </div>
   );
 }
 
-function ProjectView({ project, onDeleteProject }: { project: TaskProject; onDeleteProject: () => void }) {
+function ProjectView({ project }: { project: TaskProject }) {
   const { state, update } = useStore();
+  const confirm = useConfirm();
   const [title, setTitle] = useState('');
   const [important, setImportant] = useState(false);
 
@@ -132,15 +109,33 @@ function ProjectView({ project, onDeleteProject }: { project: TaskProject; onDel
     update((draft) => { draft.taskItems = draft.taskItems.filter((t) => t.id !== id); });
   };
 
+  const deleteProject = async () => {
+    const ok = await confirm({
+      title: 'Удалить проект?',
+      message: `«${project.name}» и все его шаги будут удалены безвозвратно.`,
+      confirmLabel: 'Удалить',
+    });
+    if (!ok) return;
+    update((draft) => {
+      draft.taskProjects = draft.taskProjects.filter((p) => p.id !== project.id);
+      draft.taskItems = draft.taskItems.filter((t) => t.projectId !== project.id);
+      draft.activeTaskProjectId = null;
+    });
+  };
+
   return (
     <>
       <div className="task-project-title">
-        <h2>{project.name}</h2>
-        <button className="task-project-delete" onClick={onDeleteProject}>×</button>
+        <div>
+          <span className="task-project-kicker">проект</span>
+          <h2 className="display">{project.name}</h2>
+        </div>
+        <button className="task-project-delete" title="Удалить проект" onClick={deleteProject}>×</button>
       </div>
 
       <div className="task-add-row">
         <input
+          type="text"
           placeholder="Добавить шаг, например: наклеить обои"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -161,13 +156,13 @@ function ProjectView({ project, onDeleteProject }: { project: TaskProject; onDel
         )}
         {items.map((item) => (
           <div key={item.id} className={'task-row task-row-enter' + (item.done ? ' done' : '')}>
-            <button className={'task-check' + (item.done ? ' checked' : '')} onClick={() => toggleDone(item.id)}>{item.done ? '✓' : ''}</button>
+            <button className={'task-check' + (item.done ? ' checked' : '')} aria-label={item.done ? 'Вернуть в задачи' : 'Отметить выполненной'} onClick={() => toggleDone(item.id)} />
             <div className="task-row-copy">
               <strong>{item.title}</strong>
               <small>{item.done ? 'готово' : item.important ? 'важно' : 'шаг проекта'}</small>
             </div>
-            <button className={'task-important' + (item.important ? ' active' : '')} onClick={() => toggleImportant(item.id)}>★</button>
-            <button className="task-delete" onClick={() => remove(item.id)}>×</button>
+            <button className={'task-important' + (item.important ? ' active' : '')} title={item.important ? 'Убрать из важных' : 'Отметить важной'} onClick={() => toggleImportant(item.id)}>★</button>
+            <button className="task-delete" title="Удалить" onClick={() => remove(item.id)}>×</button>
           </div>
         ))}
       </div>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useStore } from '../../core/store';
 import { uid, COLOR_VARS, type Topic } from '../../core/types';
 import { useConfirm } from '../../ui/ConfirmDialog';
+import { CheckStroke, FlagIcon } from '../../ui/icons';
 import './detail-drawer.css';
 
 export function DetailDrawer({ topicId, onClose }: { topicId: string; onClose: () => void }) {
@@ -63,10 +64,12 @@ export function DetailDrawer({ topicId, onClose }: { topicId: string; onClose: (
 
           <div className="status-row">
             <button className={'status-pill' + (topic.done ? ' on-done' : '')} onClick={() => patch((t) => { t.done = !t.done; })}>
-              ✓ {topic.done ? 'Выучено' : 'Отметить выученным'}
+              <CheckStroke />
+              {topic.done ? 'Выучено' : 'Отметить выученным'}
             </button>
             <button className={'status-pill' + (topic.urgent ? ' on-urgent' : '')} onClick={() => patch((t) => { t.urgent = !t.urgent; })}>
-              ⚑ Срочно
+              <FlagIcon />
+              Срочно
             </button>
           </div>
 

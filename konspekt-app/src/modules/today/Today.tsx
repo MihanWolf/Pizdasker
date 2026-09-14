@@ -7,6 +7,7 @@ import {
   importantNotes,
   topWishes,
 } from '../../core/selectors';
+import { SunIcon, WalletIcon, ChecklistIcon, DropletIcon, QuoteIcon } from '../../ui/icons';
 import './today.css';
 
 export function Today() {
@@ -29,20 +30,22 @@ export function Today() {
   const showWishes = state.financeItems.some((i) => i.type === 'wish');
 
   return (
-    <div className="today-wrap">
+    <div className="today-wrap content-scroll">
       <div className="today-header">
         <div>
-          <div className="today-kicker">{dateLabel}</div>
-          <h1 className="today-title">Сегодня</h1>
+          <div className="today-kicker"><SunIcon /> {dateLabel}</div>
+          <h1 className="today-title display">Сегодня</h1>
         </div>
-        <div className="today-daily-value" style={{ color: budget.isNegative ? 'var(--urgent)' : undefined }}>
-          {fmtMoney(Math.round(budget.displayValue))} {state.currency}
+        <div className="today-right-summary">
+          <div className="today-daily-value" style={{ color: budget.isNegative ? 'var(--urgent)' : undefined }}>
+            {fmtMoney(Math.round(budget.displayValue))} {state.currency}
+          </div>
         </div>
       </div>
 
       <div className="today-grid">
         {showPayments && (
-          <Widget title="Платежи" subtitle="Неоплаченные обязательства" attention={todayNeedsAttention(state)} empty="Ближайших платежей нет" items={payments.length}>
+          <Widget title="Платежи" subtitle="Неоплаченные обязательства" attention={todayNeedsAttention(state)} empty="Ближайших платежей нет" items={payments.length} icon={<WalletIcon />} iconAccent={todayNeedsAttention(state) ? '#A63B32' : undefined}>
             {payments.map((item) => item.type === 'income' ? (
               <TodayItem
                 key={item.id}
@@ -66,7 +69,7 @@ export function Today() {
         )}
 
         {showTasks && (
-          <Widget title="Дела" subtitle="Шаги, которые нельзя потерять" attention={tasks.length > 0} empty="Важных задач пока нет" items={tasks.length}>
+          <Widget title="Дела" subtitle="Шаги, которые нельзя потерять" attention={tasks.length > 0} empty="Важных задач пока нет" items={tasks.length} icon={<ChecklistIcon />} iconAccent={tasks.length ? 'var(--rust)' : undefined}>
             {tasks.map((item) => {
               const project = state.taskProjects.find((p) => p.id === item.projectId);
               return (
@@ -84,8 +87,7 @@ export function Today() {
         )}
 
         {showPlants && (
-          <Widget title="Пора полить" subtitle="Растения без свежего полива" empty="Все растения политые" items={plants.length}>
-            {plants.map((plant) => {
+          <Widget title="Пора полить" subtitle="Растения без свежего полива" empty="Все растения политые" items={plants.length} icon={<DropletIcon />} iconAccent={plants.length ? wateringAccent(wateringDaysAgo(state, plants[0].id)) : undefined}>            {plants.map((plant) => {
               const daysAgo = wateringDaysAgo(state, plant.id);
               const last = latestWateringDate(state, plant.id);
               return (
@@ -103,7 +105,7 @@ export function Today() {
         )}
 
         {showNotes && (
-          <Widget title="Мысли" subtitle="Мысли, к которым стоит вернуться" empty="Важных заметок пока нет" items={notes.length}>
+          <Widget title="Мысли" subtitle="Мысли, к которым стоит вернуться" empty="Важных заметок пока нет" items={notes.length} icon={<QuoteIcon />}>
             {notes.map((entry) => {
               const page = state.notePages.find((p) => p.id === entry.pageId);
               return (
@@ -121,7 +123,7 @@ export function Today() {
         )}
 
         {showWishes && (
-          <Widget title="Хочеца" subtitle="Цели с самым заметным прогрессом" empty="Целей для накопления пока нет" items={wishes.length} wide>
+          <Widget title="Хочеца" subtitle="Цели с самым заметным прогрессом" empty="Целей для накопления пока нет" items={wishes.length} wide icon={<WalletIcon />}>
             {wishes.map((item) => {
               const percent = Math.min(100, Math.round(((Number(item.progress) || 0) / Number(item.amount)) * 100));
               return (
@@ -142,12 +144,15 @@ export function Today() {
   );
 }
 
-function Widget({ title, subtitle, empty, items, attention, wide, children }: { title: string; subtitle: string; empty: string; items: number; attention?: boolean; wide?: boolean; children: React.ReactNode }) {
+function Widget({ title, subtitle, empty, items, attention, wide, icon, iconAccent, children }: { title: string; subtitle: string; empty: string; items: number; attention?: boolean; wide?: boolean; icon?: React.ReactNode; iconAccent?: string; children: React.ReactNode }) {
   return (
     <section className={'today-widget' + (attention ? ' needs-attention' : '') + (wide ? ' wide' : '')}>
       <div className="today-widget-head">
-        <h2>{title}</h2>
-        <div className="today-widget-subtitle">{subtitle}</div>
+        {icon && <div className="today-widget-icon" style={iconAccent ? { color: iconAccent } : undefined}>{icon}</div>}
+        <div>
+          <h2>{title}</h2>
+          <div className="today-widget-subtitle">{subtitle}</div>
+        </div>
       </div>
       <div className="today-items">
         {items > 0 ? children : <div className="today-empty">{empty}</div>}

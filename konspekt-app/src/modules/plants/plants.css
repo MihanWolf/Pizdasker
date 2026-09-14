@@ -1,60 +1,84 @@
-.plants-layout { display: flex; height: 100%; }
-
-.plants-shelf {
-  width: 76px; flex-shrink: 0; background: linear-gradient(180deg, #DEDFD5, #D6D7CB);
-  border-right: 1px solid var(--rule); display: flex; flex-direction: column; align-items: center;
-  padding: 18px 0; gap: 8px; overflow-y: auto;
+.plant-last-watered {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-soft);
+  display: flex; align-items: center; gap: 6px;
 }
-.plants-spine {
-  width: 52px; min-height: 100px; border-radius: 4px; cursor: pointer; position: relative;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  box-shadow: 1px 1px 0 var(--shadow), 0 1px 3px var(--shadow);
-  transition: transform .18s ease;
+.plant-last-watered svg { width: 13px; height: 13px; color: var(--slate); }
+
+.plant-quick-add {
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px; border: 1.5px dashed var(--rule);
+  border-radius: 8px; margin-bottom: 18px; background: rgba(255,255,255,0.35); flex-wrap: wrap;
 }
-.plants-spine:hover { transform: translateX(3px); }
-.plants-spine.active { transform: translateX(7px); }
-.plants-spine-label { writing-mode: vertical-rl; color: #F4F3EC; font-size: 12px; font-weight: 600; padding: 10px 0; text-align: center; }
-.plants-spine-count { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); writing-mode: horizontal-tb; font-size: 9px; color: rgba(255,255,255,0.85); font-family: monospace; }
-.plants-add { width: 52px; height: 40px; border-radius: 4px; border: 2px dashed #B7B8AC; background: transparent; color: #8C8E82; font-size: 20px; cursor: pointer; flex-shrink: 0; }
-.plants-add-input { width: 52px; font-size: 10px; text-align: center; border: 1px solid var(--rule); border-radius: 4px; padding: 4px 2px; }
-
-.plants-main { flex: 1; min-width: 0; overflow-y: auto; padding: 24px 40px 70px; }
-.plants-welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; color: var(--ink-soft); gap: 8px; }
-.plants-welcome-title { font-family: 'Fraunces', serif; font-size: 26px; color: var(--ink); }
-
-.plants-topbar { display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 14px; border-bottom: 2px solid; margin-bottom: 14px; gap: 20px; flex-wrap: wrap; }
-.plants-title { font-family: 'Fraunces', serif; font-size: 28px; font-style: italic; font-weight: 600; }
-.plants-meta { display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--ink-soft); }
-.plants-delete { background: none; border: none; color: var(--ink-faint); cursor: pointer; font-family: monospace; font-size: 11px; }
-.plants-delete:hover { color: var(--urgent); }
-
-.plants-search { width: 100%; max-width: 340px; border: 1px solid var(--rule); background: rgba(255,255,255,0.5); border-radius: 6px; padding: 7px 12px; font-family: monospace; font-size: 12.5px; outline: none; margin-bottom: 16px; display: block; }
-.plants-empty { text-align: center; padding: 40px 20px; color: var(--ink-faint); font-size: 13.5px; }
-
-.plant-quick-add { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border: 1.5px dashed var(--rule); border-radius: 8px; margin-bottom: 18px; background: rgba(255,255,255,0.35); flex-wrap: wrap; }
-.plant-quick-add input[type="date"] { border: none; border-bottom: 1px dashed var(--rule); background: transparent; outline: none; font-size: 12px; font-family: monospace; color: var(--ink-soft); width: 120px; }
-.plant-quick-add input[type="number"] { width: 60px; border: none; border-bottom: 1px dashed var(--rule); background: transparent; outline: none; font-size: 13.5px; font-family: monospace; }
-.plant-quick-add input[type="text"] { flex: 1; min-width: 110px; border: none; border-bottom: 1px dashed var(--rule); background: transparent; outline: none; font-size: 13px; }
-.fert-inputs { display: flex; gap: 10px; align-items: center; }
-.fert-field { display: flex; align-items: center; gap: 4px; }
-.fert-field label { font-family: monospace; font-size: 10px; color: var(--ink-faint); }
-.fert-field input { width: 38px; border: none; border-bottom: 1px dashed var(--rule); background: transparent; outline: none; font-family: monospace; font-size: 11.5px; text-align: right; }
-.plant-quick-add button { border: none; background: var(--ink); color: #fff; border-radius: 6px; padding: 7px 16px; font-size: 12.5px; cursor: pointer; }
+.plant-quick-add input[type="date"] {
+  border: none; border-bottom: 1px dashed var(--rule); background: transparent; outline: none;
+  font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--ink-soft); width: 120px;
+}
+.plant-quick-add input[type="number"] {
+  width: 60px; border: none; border-bottom: 1px dashed var(--rule); background: transparent; outline: none;
+  font-size: 13.5px; font-family: 'JetBrains Mono', monospace; color: var(--ink);
+}
+.plant-quick-add .fert-inputs { display: flex; gap: 10px; align-items: center; }
+.plant-quick-add .fert-inputs .fert-field { display: flex; align-items: center; gap: 3px; }
+.plant-quick-add .fert-inputs .fert-field label { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-faint); }
+.plant-quick-add .fert-inputs input { width: 36px; }
+.plant-quick-add input[type="text"] {
+  flex: 1; min-width: 110px; border: none; border-bottom: 1px dashed var(--rule); background: transparent; outline: none;
+  font-size: 13px; font-family: 'Inter', sans-serif; color: var(--ink);
+}
+.plant-quick-add input::placeholder { color: var(--ink-faint); font-style: italic; }
+.plant-quick-add button {
+  border: none; background: var(--ink); color: #fff; border-radius: 6px; padding: 7px 16px;
+  font-size: 12.5px; cursor: pointer; flex-shrink: 0;
+}
 
 .waterings-list { display: flex; flex-direction: column; gap: 10px; }
-.watering-row { background: var(--card); border-radius: 4px 10px 10px 4px; padding: 12px 16px; box-shadow: 0 1px 2px var(--shadow), 0 4px 10px -6px var(--shadow); border-left: 4px solid; position: relative; }
+.watering-row {
+  background: var(--card); border-radius: 4px 10px 10px 4px; padding: 12px 16px;
+  box-shadow: 0 1px 2px var(--shadow), 0 4px 10px -6px var(--shadow);
+  border-left: 4px solid var(--card-accent, var(--forest)); position: relative;
+}
 .watering-row-enter { animation: watering-row-in 0.28s cubic-bezier(.2,.8,.3,1) both; }
 @keyframes watering-row-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
 .watering-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.watering-date { font-family: monospace; font-size: 12.5px; font-weight: 600; outline: none; border: none; background: transparent; }
-.watering-pill { font-family: monospace; font-size: 11px; padding: 2px 9px; border-radius: 10px; background: rgba(67,93,135,0.12); color: var(--slate); outline: none; }
+.watering-date {
+  font-family: 'JetBrains Mono', monospace; font-size: 12.5px; font-weight: 600; color: var(--ink);
+  outline: none; border: none; background: transparent;
+}
+.watering-date:focus { border-bottom: 1px dashed var(--ink-faint); }
+.watering-pill {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 2px 9px; border-radius: 10px;
+  background: rgba(67,93,135,0.12); color: var(--slate); outline: none; border-bottom: 1px dashed transparent;
+}
+.watering-pill:focus { border-bottom: 1px dashed var(--ink-faint); }
 .watering-pill.ph { background: rgba(185,85,42,0.12); color: var(--rust); }
 .watering-pill:empty::before { content: attr(data-placeholder); color: var(--ink-faint); font-style: italic; }
-.fert-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
-.fert-summary-pill { font-family: monospace; font-size: 11px; padding: 2px 9px; border-radius: 10px; cursor: pointer; background: rgba(0,0,0,0.045); color: var(--ink-faint); }
+
+.fert-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fert-summary-pill {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 2px 9px; border-radius: 10px;
+  cursor: pointer; background: rgba(0,0,0,0.045); color: var(--ink-faint);
+}
+.fert-pill {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 2px 9px; border-radius: 10px;
+  background: rgba(63,120,74,0.12); color: var(--forest);
+}
 .fert-grid { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-.watering-note { margin-top: 6px; font-size: 12.5px; color: var(--ink-soft); outline: none; line-height: 1.5; white-space: pre-wrap; }
+.fert-field { display: flex; align-items: center; gap: 4px; }
+.fert-field label { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-faint); }
+.fert-field input {
+  width: 38px; border: none; border-bottom: 1px dashed var(--rule); background: transparent; outline: none;
+  font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--ink); text-align: right;
+}
+.fert-field input:focus { border-bottom-color: var(--ink-soft); }
+
+.watering-note {
+  margin-top: 6px; font-size: 12.5px; color: var(--ink-soft); outline: none; line-height: 1.5;
+  border-bottom: 1px dashed transparent; white-space: pre-wrap;
+}
 .watering-note:empty::before { content: attr(data-placeholder); color: var(--ink-faint); font-style: italic; }
-.watering-del { background: none; border: none; color: var(--ink-faint); cursor: pointer; font-size: 14px; opacity: 0; transition: opacity .15s; margin-left: auto; }
+.watering-note:focus { border-bottom: 1px dashed var(--ink-faint); }
+.watering-del {
+  background: none; border: none; color: var(--ink-faint); cursor: pointer; font-size: 14px;
+  opacity: 0; transition: opacity .15s; margin-left: auto; flex-shrink: 0;
+}
 .watering-row:hover .watering-del { opacity: 1; }
 .watering-del:hover { color: var(--urgent); }

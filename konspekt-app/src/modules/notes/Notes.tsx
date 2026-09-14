@@ -1,32 +1,39 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useStore } from '../../core/store';
-import { uid, COLOR_VARS, PALETTE, type NotePage } from '../../core/types';
+import { uid, COLOR_VARS, type NotePage, type NoteEntry } from '../../core/types';
 import { filteredNotesForPage, noteCountLabel } from '../../core/selectors';
 import { useConfirm } from '../../ui/ConfirmDialog';
+import { TopBar, useCycleColor } from '../../app/TopBar';
 import './notes.css';
 
 export function Notes() {
-  const { state, update } = useStore();
-  const [search, setSearch] = useState('');
-  const [newPageName, setNewPageName] = useState<string | null>(null);
-  const confirm = useConfirm();
-
+  const { state } = useStore();
   const activePage = state.notePages.find((p) => p.id === state.activeNotePageId) ?? null;
 
-  const selectPage = (id: string | null) => update((draft) => { draft.activeNotePageId = id; });
+  if (!activePage) {
+    return (
+      <div className="content-scroll">
+        <div className="welcome">
+          <div className="display">Пока пусто</div>
+          <div>Добавь первую страницу заметок через «+» слева — например, «Идеи» или «Цитаты»</div>
+        </div>
+      </div>
+    );
+  }
 
-  const addPage = () => {
-    const name = newPageName?.trim();
-    setNewPageName(null);
-    if (!name) return;
-    const page: NotePage = { id: uid(), name, color: PALETTE[state.notePages.length % PALETTE.length], createdAt: Date.now() };
-    update((draft) => {
-      draft.notePages.push(page);
-      draft.activeNotePageId = page.id;
-    });
-  };
+  return <NotesPageView key={activePage.id} page={activePage} />;
+}
 
-  const deletePage = async (page: NotePage) => {
+function NotesPageView({ page }: { page: NotePage }) {
+  const { state, update } = useStore();
+  const confirm = useConfirm();
+  const cycleColor = useCycleColor();
+
+  const search = state.notesSearch;
+  const entries = filteredNotesForPage(state, page.id, search);
+  const totalCount = state.noteEntries.filter((e) => e.pageId === page.id).length;
+
+  const deletePage = async () => {
     const ok = await confirm({
       title: 'Удалить страницу?',
       message: `«${page.name}» и все записи на ней будут удалены безвозвратно.`,
@@ -36,166 +43,150 @@ export function Notes() {
     update((draft) => {
       draft.notePages = draft.notePages.filter((p) => p.id !== page.id);
       draft.noteEntries = draft.noteEntries.filter((e) => e.pageId !== page.id);
+      draft.activeNotePageId = null;
     });
   };
 
   return (
-    <div className="notes-layout">
-      <aside className="notes-shelf">
-        {state.notePages.map((page) => {
-          const count = state.noteEntries.filter((e) => e.pageId === page.id).length;
-          return (
-            <div
-              key={page.id}
-              className={'notes-spine' + (page.id === state.activeNotePageId ? ' active' : '')}
-              style={{ background: COLOR_VARS[page.color] }}
-              onClick={() => { selectPage(page.id); setSearch(''); }}
-            >
-              <div className="notes-spine-label">{page.name}</div>
-              <div className="notes-spine-count">{count}</div>
-            </div>
-          );
-        })}
-        {newPageName === null ? (
-          <button className="notes-add-page" onClick={() => setNewPageName('')}>+</button>
-        ) : (
-          <div className="notes-add-page-form">
-            <input
-              autoFocus
-              placeholder="Например, Идеи"
-              value={newPageName}
-              onChange={(e) => setNewPageName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') addPage(); if (e.key === 'Escape') setNewPageName(null); }}
-              onBlur={addPage}
-            />
-          </div>
-        )}
-      </aside>
+    <>
+      <TopBar
+        name={page.name}
+        color={page.color}
+        onRename={(name) => { if (name) update((draft) => { const p = draft.notePages.find((x) => x.id === page.id); if (p) p.name = name; }); }}
+        onCycleColor={() => cycleColor('page', page.id)}
+        deleteLabel="удалить страницу"
+        deleteTitle="Удалить страницу?"
+        deleteMessage={`«${page.name}» и все записи на ней будут удалены безвозвратно.`}
+        onDelete={deletePage}
+        meta={<span className="mono">{totalCount} {noteCountLabel(totalCount)}</span>}
+      />
 
-      <main className="notes-main">
-        {!activePage ? (
-          <div className="notes-welcome">
-            <div className="notes-welcome-title">Пока пусто</div>
-            <div>Добавь первую страницу заметок через «+» слева — например, «Идеи» или «Цитаты»</div>
-          </div>
-        ) : (
-          <NotesPageView page={activePage} search={search} onSearch={setSearch} onDeletePage={() => deletePage(activePage)} />
-        )}
-      </main>
+      <div className="searchbar">
+        <input
+          className="search-input"
+          placeholder="Поиск по записям..."
+          value={search}
+          onChange={(e) => update((draft) => { draft.notesSearch = e.target.value; })}
+        />
+      </div>
+
+      <div className="content-scroll">
+        {!search && <QuickAddNote pageId={page.id} />}
+        <NotesList page={page} entries={entries} search={search} />
+      </div>
+    </>
+  );
+}
+
+function QuickAddNote({ pageId }: { pageId: string }) {
+  const { update } = useStore();
+  const [content, setContent] = useState('');
+  const [source, setSource] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const autoResize = (el: HTMLTextAreaElement) => {
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  };
+
+  const submit = () => {
+    const trimmed = content.trim();
+    if (!trimmed) return;
+    update((draft) => {
+      draft.noteEntries.unshift({ id: uid(), pageId, content: trimmed, source: source.trim(), important: false, createdAt: Date.now() });
+    });
+    setContent('');
+    setSource('');
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+  };
+
+  return (
+    <div className="notes-quick-add">
+      <textarea
+        ref={textareaRef}
+        rows={2}
+        placeholder="Мысль, цитата, наблюдение... что угодно"
+        value={content}
+        onChange={(e) => { setContent(e.target.value); autoResize(e.target); }}
+        onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) submit(); }}
+      />
+      <div className="note-add-row">
+        <input
+          placeholder="источник / кто сказал (необязательно)"
+          value={source}
+          onChange={(e) => setSource(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
+        />
+        <button onClick={submit}>Добавить</button>
+        <span className="note-add-hint">Ctrl+Enter</span>
+      </div>
     </div>
   );
 }
 
-function NotesPageView({ page, search, onSearch, onDeletePage }: { page: NotePage; search: string; onSearch: (v: string) => void; onDeletePage: () => void }) {
-  const { state, update } = useStore();
-  const [draftContent, setDraftContent] = useState('');
-  const [draftSource, setDraftSource] = useState('');
+function NotesList({ page, entries, search }: { page: NotePage; entries: NoteEntry[]; search: string }) {
+  const { update } = useStore();
   const confirm = useConfirm();
-
-  const entries = filteredNotesForPage(state, page.id, search);
-
-  const addEntry = () => {
-    const content = draftContent.trim();
-    if (!content) return;
-    update((draft) => {
-      draft.noteEntries.unshift({ id: uid(), pageId: page.id, content, source: draftSource.trim(), important: false, createdAt: Date.now() });
-    });
-    setDraftContent('');
-    setDraftSource('');
-  };
-
-  const toggleImportant = (id: string) => {
-    update((draft) => {
-      const entry = draft.noteEntries.find((e) => e.id === id);
-      if (entry) entry.important = !entry.important;
-    });
-  };
-
-  const updateEntry = (id: string, field: 'content' | 'source', value: string) => {
-    update((draft) => {
-      const entry = draft.noteEntries.find((e) => e.id === id);
-      if (entry) entry[field] = value;
-    });
-  };
 
   const deleteEntry = async (id: string) => {
     const ok = await confirm({ title: 'Удалить запись?', message: 'Эта заметка будет удалена безвозвратно.', confirmLabel: 'Удалить' });
     if (ok) update((draft) => { draft.noteEntries = draft.noteEntries.filter((e) => e.id !== id); });
   };
 
-  return (
-    <>
-      <div className="notes-topbar" style={{ borderBottomColor: COLOR_VARS[page.color] }}>
-        <div className="notes-title">{page.name}</div>
-        <div className="notes-meta">
-          <span>{entries.length} {noteCountLabel(entries.length)}</span>
-          <button className="notes-delete-page" onClick={onDeletePage}>удалить страницу</button>
-        </div>
+  if (entries.length === 0) {
+    return (
+      <div className="empty-state">
+        <span className="display">{search ? 'Ничего не найдено' : 'Пока пусто'}</span>
+        {search ? 'Попробуй другой запрос' : 'Впиши мысль или цитату выше'}
       </div>
+    );
+  }
 
-      <input
-        className="notes-search"
-        placeholder="Поиск по записям..."
-        value={search}
-        onChange={(e) => onSearch(e.target.value)}
-      />
-
-      {!search && (
-        <div className="notes-quick-add">
-          <textarea
-            rows={2}
-            placeholder="Мысль, цитата, наблюдение... что угодно"
-            value={draftContent}
-            onChange={(e) => setDraftContent(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) addEntry(); }}
-          />
-          <div className="notes-add-row">
-            <input
-              placeholder="источник / кто сказал (необязательно)"
-              value={draftSource}
-              onChange={(e) => setDraftSource(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') addEntry(); }}
-            />
-            <button onClick={addEntry}>Добавить</button>
-            <span className="notes-hint">Ctrl+Enter</span>
+  return (
+    <div className="notes-quotes-list">
+      {entries.map((entry) => (
+        <div key={entry.id} className="quote-card quote-card-enter" style={{ ['--card-accent' as string]: COLOR_VARS[page.color] }}>
+          <div className="quote-mark">&ldquo;</div>
+          <div
+            className="quote-content"
+            contentEditable
+            suppressContentEditableWarning
+            spellCheck={false}
+            onBlur={(e) => {
+              const value = e.currentTarget.textContent?.trim() ?? '';
+              update((draft) => { const x = draft.noteEntries.find((n) => n.id === entry.id); if (x) x.content = value; });
+            }}
+          >
+            {entry.content}
           </div>
-        </div>
-      )}
-
-      <div className="notes-quotes-list">
-        {entries.length === 0 && (
-          <div className="notes-empty">{search ? 'Ничего не найдено' : 'Впиши мысль или цитату выше'}</div>
-        )}
-        {entries.map((entry) => (
-          <div key={entry.id} className="quote-card quote-card-enter" style={{ borderLeftColor: COLOR_VARS[page.color] }}>
-            <div className="quote-mark" style={{ color: COLOR_VARS[page.color] }}>&ldquo;</div>
+          <div className="quote-footer">
             <div
-              className="quote-content"
+              className="quote-source"
               contentEditable
               suppressContentEditableWarning
-              onBlur={(e) => updateEntry(entry.id, 'content', e.currentTarget.textContent?.trim() ?? '')}
+              spellCheck={false}
+              data-role="source"
+              onBlur={(e) => {
+                const value = e.currentTarget.textContent?.trim() ?? '';
+                update((draft) => { const x = draft.noteEntries.find((n) => n.id === entry.id); if (x) x.source = value; });
+              }}
             >
-              {entry.content}
+              {entry.source}
             </div>
-            <div className="quote-footer">
-              <div
-                className="quote-source"
-                contentEditable
-                suppressContentEditableWarning
-                data-placeholder="+ источник"
-                onBlur={(e) => updateEntry(entry.id, 'source', e.currentTarget.textContent?.trim() ?? '')}
+            <div className="quote-meta">
+              <span className="quote-date">{new Date(entry.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              <button
+                className={'quote-important' + (entry.important ? ' active' : '')}
+                title={entry.important ? 'Убрать из важных' : 'Отметить важной'}
+                onClick={() => update((draft) => { const x = draft.noteEntries.find((n) => n.id === entry.id); if (x) x.important = !x.important; })}
               >
-                {entry.source}
-              </div>
-              <div className="quote-meta">
-                <span className="quote-date">{new Date(entry.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                <button className={'quote-important' + (entry.important ? ' active' : '')} onClick={() => toggleImportant(entry.id)}>★</button>
-                <button className="quote-del" onClick={() => deleteEntry(entry.id)}>×</button>
-              </div>
+                ★
+              </button>
+              <button className="quote-del" title="Удалить" onClick={() => deleteEntry(entry.id)}>×</button>
             </div>
           </div>
-        ))}
-      </div>
-    </>
+        </div>
+      ))}
+    </div>
   );
 }
