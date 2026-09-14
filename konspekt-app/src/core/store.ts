@@ -52,6 +52,23 @@ function hasAnyUserData(s: AppState): boolean {
   );
 }
 
+// Активный элемент должен всегда указывать на существующую запись.
+// Если id пуст или ссылается на удалённый элемент — берём первый из списка.
+function pickActive<T extends { id: string }>(items: T[], activeId: string | null): string | null {
+  if (activeId && items.some((i) => i.id === activeId)) return activeId;
+  return items[0]?.id ?? null;
+}
+
+export function withActiveIdFallbacks(s: AppState): AppState {
+  return {
+    ...s,
+    activeSubjectId: pickActive(s.subjects, s.activeSubjectId),
+    activeNotePageId: pickActive(s.notePages, s.activeNotePageId),
+    activePlantId: pickActive(s.plants, s.activePlantId),
+    activeTaskProjectId: pickActive(s.taskProjects, s.activeTaskProjectId),
+  };
+}
+
 export const useStore = create<Store>((set, get) => ({
   state: createEmptyState(),
   loaded: false,
@@ -67,7 +84,7 @@ export const useStore = create<Store>((set, get) => ({
         if (!parsed.onboarding || typeof parsed.onboarding.active !== 'boolean') {
           merged.onboarding = { active: !hasAnyUserData(merged), scene: 'birth' };
         }
-        set({ state: merged, saveStatus: { kind: 'saved', text: 'Данные загружены' } });
+        set({ state: withActiveIdFallbacks(merged), saveStatus: { kind: 'saved', text: 'Данные загружены' } });
       } catch {
         set({ saveStatus: { kind: 'idle', text: 'Новый список' } });
       }
@@ -80,12 +97,12 @@ export const useStore = create<Store>((set, get) => ({
   update: (mutator) => {
     const draft = structuredClone(get().state);
     mutator(draft);
-    set({ state: draft });
+    set({ state: withActiveIdFallbacks(draft) });
     queueSave(get, set);
   },
 
   importState: (next) => {
-    set({ state: next });
+    set({ state: withActiveIdFallbacks(next) });
     queueSave(get, set);
   },
 

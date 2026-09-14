@@ -14,20 +14,23 @@ const FERT_KEYS: [keyof FertAmounts, string][] = [
 
 export function Plants() {
   const { state, update } = useStore();
-  const [activePlantId, setActivePlantId] = useState<string | null>(state.plants[0]?.id ?? null);
   const [search, setSearch] = useState('');
   const [newPlantName, setNewPlantName] = useState<string | null>(null);
   const confirm = useConfirm();
 
-  const activePlant = state.plants.find((p) => p.id === activePlantId) ?? null;
+  const activePlant = state.plants.find((p) => p.id === state.activePlantId) ?? null;
+
+  const selectPlant = (id: string | null) => update((draft) => { draft.activePlantId = id; });
 
   const addPlant = () => {
     const name = newPlantName?.trim();
     setNewPlantName(null);
     if (!name) return;
     const plant: Plant = { id: uid(), name, color: PALETTE[state.plants.length % PALETTE.length], createdAt: Date.now() };
-    update((draft) => { draft.plants.push(plant); });
-    setActivePlantId(plant.id);
+    update((draft) => {
+      draft.plants.push(plant);
+      draft.activePlantId = plant.id;
+    });
   };
 
   const deletePlant = async (plant: Plant) => {
@@ -41,7 +44,6 @@ export function Plants() {
       draft.plants = draft.plants.filter((p) => p.id !== plant.id);
       draft.waterings = draft.waterings.filter((w) => w.plantId !== plant.id);
     });
-    if (activePlantId === plant.id) setActivePlantId(state.plants.find((p) => p.id !== plant.id)?.id ?? null);
   };
 
   return (
@@ -52,9 +54,9 @@ export function Plants() {
           return (
             <div
               key={plant.id}
-              className={'plants-spine' + (plant.id === activePlantId ? ' active' : '')}
+              className={'plants-spine' + (plant.id === state.activePlantId ? ' active' : '')}
               style={{ background: COLOR_VARS[plant.color] }}
-              onClick={() => { setActivePlantId(plant.id); setSearch(''); }}
+              onClick={() => { selectPlant(plant.id); setSearch(''); }}
             >
               <div className="plants-spine-label">{plant.name}</div>
               <div className="plants-spine-count">{count}</div>

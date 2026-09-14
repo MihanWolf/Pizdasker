@@ -8,21 +8,24 @@ import './study.css';
 
 export function Study() {
   const { state, update } = useStore();
-  const [activeSubjectId, setActiveSubjectId] = useState<string | null>(state.subjects[0]?.id ?? null);
   const [search, setSearch] = useState('');
   const [newSubjectName, setNewSubjectName] = useState<string | null>(null);
   const [openTopicId, setOpenTopicId] = useState<string | null>(null);
   const confirm = useConfirm();
 
-  const subject = state.subjects.find((s) => s.id === activeSubjectId) ?? null;
+  const subject = state.subjects.find((s) => s.id === state.activeSubjectId) ?? null;
+
+  const selectSubject = (id: string | null) => update((draft) => { draft.activeSubjectId = id; });
 
   const addSubject = () => {
     const name = newSubjectName?.trim();
     setNewSubjectName(null);
     if (!name) return;
     const sub: Subject = { id: uid(), name, color: PALETTE[state.subjects.length % PALETTE.length], createdAt: Date.now() };
-    update((draft) => { draft.subjects.push(sub); });
-    setActiveSubjectId(sub.id);
+    update((draft) => {
+      draft.subjects.push(sub);
+      draft.activeSubjectId = sub.id;
+    });
   };
 
   const deleteSubject = async (sub: Subject) => {
@@ -33,7 +36,6 @@ export function Study() {
       draft.groups = draft.groups.filter((g) => g.subjectId !== sub.id);
       draft.topics = draft.topics.filter((t) => t.subjectId !== sub.id);
     });
-    if (activeSubjectId === sub.id) setActiveSubjectId(state.subjects.find((s) => s.id !== sub.id)?.id ?? null);
   };
 
   return (
@@ -44,9 +46,9 @@ export function Study() {
           return (
             <div
               key={sub.id}
-              className={'study-spine' + (sub.id === activeSubjectId ? ' active' : '')}
+              className={'study-spine' + (sub.id === state.activeSubjectId ? ' active' : '')}
               style={{ background: COLOR_VARS[sub.color] }}
-              onClick={() => { setActiveSubjectId(sub.id); setSearch(''); }}
+              onClick={() => { selectSubject(sub.id); setSearch(''); }}
             >
               <div className="study-spine-label">{sub.name}</div>
               <div className="study-spine-count">{done}/{total}</div>

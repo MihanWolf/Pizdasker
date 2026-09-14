@@ -7,20 +7,23 @@ import './notes.css';
 
 export function Notes() {
   const { state, update } = useStore();
-  const [activePageId, setActivePageId] = useState<string | null>(state.notePages[0]?.id ?? null);
   const [search, setSearch] = useState('');
   const [newPageName, setNewPageName] = useState<string | null>(null);
   const confirm = useConfirm();
 
-  const activePage = state.notePages.find((p) => p.id === activePageId) ?? null;
+  const activePage = state.notePages.find((p) => p.id === state.activeNotePageId) ?? null;
+
+  const selectPage = (id: string | null) => update((draft) => { draft.activeNotePageId = id; });
 
   const addPage = () => {
     const name = newPageName?.trim();
     setNewPageName(null);
     if (!name) return;
     const page: NotePage = { id: uid(), name, color: PALETTE[state.notePages.length % PALETTE.length], createdAt: Date.now() };
-    update((draft) => { draft.notePages.push(page); });
-    setActivePageId(page.id);
+    update((draft) => {
+      draft.notePages.push(page);
+      draft.activeNotePageId = page.id;
+    });
   };
 
   const deletePage = async (page: NotePage) => {
@@ -34,7 +37,6 @@ export function Notes() {
       draft.notePages = draft.notePages.filter((p) => p.id !== page.id);
       draft.noteEntries = draft.noteEntries.filter((e) => e.pageId !== page.id);
     });
-    if (activePageId === page.id) setActivePageId(state.notePages.find((p) => p.id !== page.id)?.id ?? null);
   };
 
   return (
@@ -45,9 +47,9 @@ export function Notes() {
           return (
             <div
               key={page.id}
-              className={'notes-spine' + (page.id === activePageId ? ' active' : '')}
+              className={'notes-spine' + (page.id === state.activeNotePageId ? ' active' : '')}
               style={{ background: COLOR_VARS[page.color] }}
-              onClick={() => { setActivePageId(page.id); setSearch(''); }}
+              onClick={() => { selectPage(page.id); setSearch(''); }}
             >
               <div className="notes-spine-label">{page.name}</div>
               <div className="notes-spine-count">{count}</div>

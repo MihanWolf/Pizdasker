@@ -14,9 +14,11 @@ function countLabel(value: number): string {
 
 export function Shopping() {
   const { state, update } = useStore();
-  const [view, setView] = useState<'current' | 'archive'>('current');
   const [title, setTitle] = useState('');
   const [quantity, setQuantity] = useState('');
+
+  const view = state.shoppingView;
+  const setView = (next: 'current' | 'archive') => update((draft) => { draft.shoppingView = next; });
 
   const items = state.shoppingItems.filter((i) => (view === 'archive' ? i.purchasedAt : !i.purchasedAt));
 

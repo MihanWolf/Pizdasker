@@ -7,23 +7,28 @@ import './tasks.css';
 
 export function Tasks() {
   const { state, update } = useStore();
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(state.taskProjects[0]?.id ?? null);
-  const [view, setView] = useState<'current' | 'archive'>('current');
   const [newProjectName, setNewProjectName] = useState<string | null>(null);
   const confirm = useConfirm();
 
-  const project = state.taskProjects.find((p) => p.id === activeProjectId) ?? null;
+  const project = state.taskProjects.find((p) => p.id === state.activeTaskProjectId) ?? null;
   const projectItems = project ? taskProjectItems(state, project.id) : [];
   const doneCount = projectItems.filter((t) => t.done).length;
+
+  const selectProject = (id: string | null) => update((draft) => {
+    draft.activeTaskProjectId = id;
+    draft.tasksView = 'current';
+  });
 
   const addProject = () => {
     const name = newProjectName?.trim();
     setNewProjectName(null);
     if (!name) return;
     const proj: TaskProject = { id: uid(), name, color: PALETTE[state.taskProjects.length % PALETTE.length], createdAt: Date.now() };
-    update((draft) => { draft.taskProjects.push(proj); });
-    setActiveProjectId(proj.id);
-    setView('current');
+    update((draft) => {
+      draft.taskProjects.push(proj);
+      draft.activeTaskProjectId = proj.id;
+      draft.tasksView = 'current';
+    });
   };
 
   const deleteProject = async () => {
@@ -34,12 +39,10 @@ export function Tasks() {
       confirmLabel: 'Удалить',
     });
     if (!ok) return;
-    const remaining = state.taskProjects.filter((p) => p.id !== project.id);
     update((draft) => {
       draft.taskProjects = draft.taskProjects.filter((p) => p.id !== project.id);
       draft.taskItems = draft.taskItems.filter((t) => t.projectId !== project.id);
     });
-    setActiveProjectId(remaining[0]?.id ?? null);
   };
 
   return (
@@ -55,8 +58,8 @@ export function Tasks() {
           return (
             <button
               key={p.id}
-              className={'task-tab' + (p.id === activeProjectId ? ' active' : '')}
-              onClick={() => { setActiveProjectId(p.id); setView('current'); }}
+              className={'task-tab' + (p.id === state.activeTaskProjectId ? ' active' : '')}
+              onClick={() => selectProject(p.id)}
             >
               {p.name} <span>{count}</span>
             </button>
@@ -83,16 +86,19 @@ export function Tasks() {
           Создай вкладку «Дом», «Работа» или «Личное», а потом добавь в неё шаги.
         </div>
       ) : (
-        <ProjectView project={project} view={view} onView={setView} onDeleteProject={deleteProject} />
+        <ProjectView project={project} onDeleteProject={deleteProject} />
       )}
     </div>
   );
 }
 
-function ProjectView({ project, view, onView, onDeleteProject }: { project: TaskProject; view: 'current' | 'archive'; onView: (v: 'current' | 'archive') => void; onDeleteProject: () => void }) {
+function ProjectView({ project, onDeleteProject }: { project: TaskProject; onDeleteProject: () => void }) {
   const { state, update } = useStore();
   const [title, setTitle] = useState('');
   const [important, setImportant] = useState(false);
+
+  const view = state.tasksView;
+  const setView = (v: 'current' | 'archive') => update((draft) => { draft.tasksView = v; });
 
   const items = filteredTasksForProject(state, project.id, view);
   const currentCount = filteredTasksForProject(state, project.id, 'current').length;
@@ -145,8 +151,8 @@ function ProjectView({ project, view, onView, onDeleteProject }: { project: Task
       </div>
 
       <div className="task-filter-tabs">
-        <button className={'task-filter' + (view === 'current' ? ' active' : '')} onClick={() => onView('current')}>Открытые <span>{currentCount}</span></button>
-        <button className={'task-filter' + (view === 'archive' ? ' active' : '')} onClick={() => onView('archive')}>Готовые <span>{archiveCount}</span></button>
+        <button className={'task-filter' + (view === 'current' ? ' active' : '')} onClick={() => setView('current')}>Открытые <span>{currentCount}</span></button>
+        <button className={'task-filter' + (view === 'archive' ? ' active' : '')} onClick={() => setView('archive')}>Готовые <span>{archiveCount}</span></button>
       </div>
 
       <div className="task-list">
