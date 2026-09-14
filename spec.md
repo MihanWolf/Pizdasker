@@ -589,7 +589,50 @@ npm run dev        # ручная проверка
 
 ---
 
-## 12. Соглашения по стилю
+## 12. Публикация (GitHub Pages)
+
+Приложение публикуется как статический сайт на GitHub Pages через
+GitHub Actions. Бэкенда нет — вся логика и данные (`localStorage`) работают
+в браузере, поэтому Pages подходит без изменений кода.
+
+### 12.1. Настройка
+
+- **Репозиторий:** `MihanWolf/Pizdasker` (project page).
+- **Адрес сайта:** `https://mihanwolf.github.io/Pizdasker/`.
+- **База сборки:** в `konspekt-app/vite.config.ts` задано
+  `base: '/Pizdasker/'`. Это обязательно для project page — без `base`
+  ассеты ссылаются на `/assets/...` и сайт открывается пустым.
+  **При переименовании репозитория обновить `base` соответственно.**
+
+### 12.2. Workflow
+
+Файл `.github/workflows/deploy.yml`:
+
+1. Триггер — `push` в `main` (и ручной `workflow_dispatch`).
+2. `npm ci` и `npm run build` в `konspekt-app/`.
+3. Артефакт `konspekt-app/dist` публикуется через `actions/deploy-pages`.
+
+**Автодеплой:** любой коммит в `main` автоматически пересобирает и
+обновляет сайт (1–3 минуты). Отдельно ничего запускать не нужно. Пуш в
+другие ветки на сайт не влияет. Ошибочная сборка не публикуется — на сайте
+остаётся предыдущая рабочая версия.
+
+### 12.3. Первичная настройка (один раз)
+
+В GitHub: **Settings → Pages → Source → GitHub Actions**. После этого
+достаточно пушить в `main`.
+
+### 12.4. Локальная проверка production-сборки
+
+```bash
+cd konspekt-app
+npm run build
+npm run preview   # открыть указанный URL (с учётом base)
+```
+
+---
+
+## 13. Соглашения по стилю
 
 - **CSS-переменные** (`index.css`): `--paper`, `--card`, `--ink`,
   `--ink-soft`, `--ink-faint`, `--rule`, `--shadow`, `--teal`, `--rust`,
