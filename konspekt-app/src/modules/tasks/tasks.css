@@ -7,13 +7,16 @@
 .tasks-summary { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-soft); padding-bottom: 5px; }
 
 .task-tabs { display: flex; gap: 18px; overflow-x: auto; border-bottom: 1px solid var(--rule); margin-bottom: 24px; }
-.task-tab { border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 8px 0 10px; color: var(--ink-faint); cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 11px; white-space: nowrap; }
+.task-tab { border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 8px 0 10px; color: var(--ink-faint); cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 11px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
 .task-tab span, .task-filter span { margin-left: 5px; color: inherit; }
 .task-tab.active { border-bottom-color: var(--rust); color: var(--ink); }
+.task-tab-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .task-tab-add { color: var(--rust); }
 .task-tab-add-input { width: 100px; font-size: 11px; border: 1px solid var(--rule); border-radius: 4px; padding: 4px 6px; }
 
 .task-project-title { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+.task-project-head { display: flex; align-items: flex-start; gap: 12px; }
+.task-project-head .subject-dot { margin-top: 6px; }
 .task-project-kicker { font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-faint); font-size: 9px; }
 .task-project-title h2 { font-size: 25px; font-style: italic; margin-top: 3px; }
 .task-project-delete { border: 0; background: transparent; color: var(--ink-faint); cursor: pointer; font-size: 19px; opacity: 0; }
@@ -28,10 +31,11 @@
 
 .task-filter-tabs { display: flex; gap: 18px; border-bottom: 1px solid var(--rule); margin-bottom: 3px; }
 .task-filter { border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 8px 0; color: var(--ink-faint); cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 10px; }
-.task-filter.active { border-bottom-color: var(--rust); color: var(--ink); }
+.task-filter.active { border-bottom-color: var(--task-accent, var(--rust)); color: var(--ink); }
 
 .task-list { width: 100%; }
-.task-row { display: flex; align-items: center; gap: 11px; min-height: 58px; padding: 10px 4px; border-bottom: 1px dashed var(--rule); cursor: pointer; }
+.task-row { display: flex; align-items: center; gap: 11px; min-height: 58px; padding: 10px 4px 10px 10px; border-bottom: 1px dashed var(--rule); border-left: 3px solid var(--task-accent, var(--rust)); cursor: pointer; transition: background .15s; }
+.task-row:hover { background: rgba(255,255,255,0.35); }
 .task-row-enter { animation: task-row-in 0.26s cubic-bezier(.2,.8,.3,1) both; }
 @keyframes task-row-in { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
 .task-row-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }

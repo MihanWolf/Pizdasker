@@ -34,6 +34,10 @@
 .today-item-copy em { font-size: 11px; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-style: normal; }
 .today-item-arrow { font-size: 20px; line-height: 1; color: var(--ink-faint); transition: transform .15s, color .15s; }
 .today-empty { padding: 16px 2px 8px; color: var(--ink-faint); font-size: 12px; font-style: italic; }
+.today-more {
+  padding: 10px 2px 2px 16px; color: var(--ink-faint); font-size: 11px;
+  font-family: 'JetBrains Mono', monospace; font-style: italic;
+}
 
 @media (max-width: 720px) {
   .today-header { align-items: flex-start; flex-direction: column; gap: 12px; margin-bottom: 20px; }

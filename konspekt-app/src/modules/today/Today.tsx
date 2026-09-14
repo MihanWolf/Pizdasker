@@ -1,11 +1,12 @@
 import { useStore } from '../../core/store';
+import { COLOR_VARS } from '../../core/types';
 import {
   calculateDailyBudget, fmtMoney, formatFinanceDate,
-  todayPaymentsItems, paymentDaysUntil, paymentDueLabel, paymentAccent, todayNeedsAttention,
-  importantOpenTasks,
-  plantsNeedingWater, wateringDaysAgo, wateringAccent, daysAgoLabel, latestWateringDate,
-  importantNotes,
-  topWishes,
+  todayPaymentsItems, todayPaymentsTotal, paymentDaysUntil, paymentDueLabel, paymentAccent, todayNeedsAttention,
+  todayTasks, todayTasksTotal,
+  plantsNeedingWater, plantsNeedingWaterTotal, wateringDaysAgo, wateringAccent, daysAgoLabel, latestWateringDate,
+  importantNotes, importantNotesTotal,
+  topWishes, topWishesTotal,
 } from '../../core/selectors';
 import { SunIcon, WalletIcon, ChecklistIcon, DropletIcon, QuoteIcon } from '../../ui/icons';
 import './today.css';
@@ -18,16 +19,21 @@ export function Today() {
   const goTo = (mode: typeof state.mode) => update((draft) => { draft.mode = mode; });
 
   const payments = todayPaymentsItems(state);
-  const tasks = importantOpenTasks(state);
+  const paymentsTotal = todayPaymentsTotal(state);
+  const tasks = todayTasks(state);
+  const tasksTotal = todayTasksTotal(state);
   const plants = plantsNeedingWater(state);
+  const plantsTotal = plantsNeedingWaterTotal(state);
   const notes = importantNotes(state);
+  const notesTotal = importantNotesTotal(state);
   const wishes = topWishes(state);
+  const wishesTotal = topWishesTotal(state);
 
-  const showPayments = payments.length > 0 || state.financeItems.some((i) => i.type === 'debt' || i.type === 'income');
-  const showTasks = state.taskItems.some((t) => t.important && !t.done);
+  const showPayments = paymentsTotal > 0;
+  const showTasks = tasksTotal > 0;
   const showPlants = state.plants.length > 0;
-  const showNotes = state.noteEntries.some((n) => n.important);
-  const showWishes = state.financeItems.some((i) => i.type === 'wish');
+  const showNotes = notesTotal > 0;
+  const showWishes = wishesTotal > 0;
 
   return (
     <div className="today-wrap content-scroll">
@@ -45,13 +51,13 @@ export function Today() {
 
       <div className="today-grid">
         {showPayments && (
-          <Widget title="Платежи" subtitle="Неоплаченные обязательства" attention={todayNeedsAttention(state)} empty="Ближайших платежей нет" items={payments.length} icon={<WalletIcon />} iconAccent={todayNeedsAttention(state) ? '#A63B32' : undefined}>
+          <Widget title="Платежи" subtitle="Неоплаченные обязательства" attention={todayNeedsAttention(state)} empty="Ближайших платежей нет" shown={payments.length} total={paymentsTotal} icon={<WalletIcon />} iconAccent={todayNeedsAttention(state) ? '#A63B32' : undefined}>
             {payments.map((item) => item.type === 'income' ? (
               <TodayItem
                 key={item.id}
                 title="Поступление"
                 meta={item.incomeDate ? `поступление ${formatFinanceDate(item.incomeDate)}` : 'дата не указана'}
-                accent="var(--forest)"
+                accent={COLOR_VARS.forest}
                 detail={`+${fmtMoney(item.amount)} ${state.currency}`}
                 onClick={() => goTo('finance')}
               />
@@ -69,16 +75,19 @@ export function Today() {
         )}
 
         {showTasks && (
-          <Widget title="Дела" subtitle="Шаги, которые нельзя потерять" attention={tasks.length > 0} empty="Важных задач пока нет" items={tasks.length} icon={<ChecklistIcon />} iconAccent={tasks.length ? 'var(--rust)' : undefined}>
+          <Widget title="Дела" subtitle="Важное и срочное по срокам" attention={tasks.length > 0} empty="Важных задач пока нет" shown={tasks.length} total={tasksTotal} icon={<ChecklistIcon />} iconAccent={tasks.length ? COLOR_VARS.rust : undefined}>
             {tasks.map((item) => {
               const project = state.taskProjects.find((p) => p.id === item.projectId);
+              const accent = project ? (COLOR_VARS[project.color] || COLOR_VARS.rust) : COLOR_VARS.rust;
+              const daysUntil = paymentDaysUntil(item.dueDate);
+              const detail = item.dueDate ? paymentDueLabel(daysUntil) : 'важная задача';
               return (
                 <TodayItem
                   key={item.id}
                   title={item.title}
                   meta={project ? project.name : 'Задачи'}
-                  accent="var(--rust)"
-                  detail="важная задача"
+                  accent={accent}
+                  detail={detail}
                   onClick={() => goTo('tasks')}
                 />
               );
@@ -87,7 +96,8 @@ export function Today() {
         )}
 
         {showPlants && (
-          <Widget title="Пора полить" subtitle="Растения без свежего полива" empty="Все растения политые" items={plants.length} icon={<DropletIcon />} iconAccent={plants.length ? wateringAccent(wateringDaysAgo(state, plants[0].id)) : undefined}>            {plants.map((plant) => {
+          <Widget title="Пора полить" subtitle="Растения без свежего полива" empty="Все растения политые" shown={plants.length} total={plantsTotal} icon={<DropletIcon />} iconAccent={plants.length ? wateringAccent(wateringDaysAgo(state, plants[0].id)) : undefined}>
+            {plants.map((plant) => {
               const daysAgo = wateringDaysAgo(state, plant.id);
               const last = latestWateringDate(state, plant.id);
               return (
@@ -105,7 +115,7 @@ export function Today() {
         )}
 
         {showNotes && (
-          <Widget title="Мысли" subtitle="Мысли, к которым стоит вернуться" empty="Важных заметок пока нет" items={notes.length} icon={<QuoteIcon />}>
+          <Widget title="Мысли" subtitle="Мысли, к которым стоит вернуться" empty="Важных заметок пока нет" shown={notes.length} total={notesTotal} icon={<QuoteIcon />}>
             {notes.map((entry) => {
               const page = state.notePages.find((p) => p.id === entry.pageId);
               return (
@@ -113,7 +123,7 @@ export function Today() {
                   key={entry.id}
                   title={entry.content}
                   meta={page ? page.name : 'Заметки'}
-                  accent="var(--plum)"
+                  accent={COLOR_VARS.plum}
                   detail={entry.source || ''}
                   onClick={() => goTo('notes')}
                 />
@@ -123,7 +133,7 @@ export function Today() {
         )}
 
         {showWishes && (
-          <Widget title="Хочеца" subtitle="Цели с самым заметным прогрессом" empty="Целей для накопления пока нет" items={wishes.length} wide icon={<WalletIcon />}>
+          <Widget title="Хочеца" subtitle="Цели с самым заметным прогрессом" empty="Целей для накопления пока нет" shown={wishes.length} total={wishesTotal} wide icon={<WalletIcon />}>
             {wishes.map((item) => {
               const percent = Math.min(100, Math.round(((Number(item.progress) || 0) / Number(item.amount)) * 100));
               return (
@@ -144,7 +154,8 @@ export function Today() {
   );
 }
 
-function Widget({ title, subtitle, empty, items, attention, wide, icon, iconAccent, children }: { title: string; subtitle: string; empty: string; items: number; attention?: boolean; wide?: boolean; icon?: React.ReactNode; iconAccent?: string; children: React.ReactNode }) {
+function Widget({ title, subtitle, empty, shown, total, attention, wide, icon, iconAccent, children }: { title: string; subtitle: string; empty: string; shown: number; total: number; attention?: boolean; wide?: boolean; icon?: React.ReactNode; iconAccent?: string; children: React.ReactNode }) {
+  const hidden = total - shown;
   return (
     <section className={'today-widget' + (attention ? ' needs-attention' : '') + (wide ? ' wide' : '')}>
       <div className="today-widget-head">
@@ -155,7 +166,8 @@ function Widget({ title, subtitle, empty, items, attention, wide, icon, iconAcce
         </div>
       </div>
       <div className="today-items">
-        {items > 0 ? children : <div className="today-empty">{empty}</div>}
+        {shown > 0 ? children : <div className="today-empty">{empty}</div>}
+        {hidden > 0 && <div className="today-more">… и ещё {hidden}</div>}
       </div>
     </section>
   );

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../../core/store';
-import { uid, PALETTE, type TaskProject } from '../../core/types';
+import { uid, PALETTE, COLOR_VARS, type TaskProject } from '../../core/types';
 import { taskOpenCount, taskProjectItems, filteredTasksForProject, paymentDaysUntil, paymentDueLabel, paymentAccent } from '../../core/selectors';
 import { useConfirm, useNamePrompt } from '../../ui/ConfirmDialog';
 import { ChecklistIcon } from '../../ui/icons';
@@ -45,12 +45,15 @@ export function Tasks() {
       <div className="task-tabs" role="tablist">
         {state.taskProjects.map((p) => {
           const count = taskOpenCount(state, p.id);
+          const active = p.id === state.activeTaskProjectId;
           return (
             <button
               key={p.id}
-              className={'task-tab' + (p.id === state.activeTaskProjectId ? ' active' : '')}
+              className={'task-tab' + (active ? ' active' : '')}
+              style={active ? { borderBottomColor: COLOR_VARS[p.color] || COLOR_VARS.rust } : undefined}
               onClick={() => selectProject(p.id)}
             >
+              <span className="task-tab-dot" style={{ background: COLOR_VARS[p.color] || COLOR_VARS.rust }} />
               {p.name} <span>{count}</span>
             </button>
           );
@@ -90,6 +93,16 @@ function ProjectView({ project, onOpenTask }: { project: TaskProject; onOpenTask
     update((draft) => {
       const p = draft.taskProjects.find((x) => x.id === project.id);
       if (p) p.name = name;
+    });
+  };
+
+  const cycleColor = () => {
+    update((draft) => {
+      const p = draft.taskProjects.find((x) => x.id === project.id);
+      if (p) {
+        const idx = PALETTE.indexOf(p.color);
+        p.color = PALETTE[(idx + 1) % PALETTE.length];
+      }
     });
   };
 
@@ -138,18 +151,21 @@ function ProjectView({ project, onOpenTask }: { project: TaskProject; onOpenTask
   return (
     <>
       <div className="task-project-title">
-        <div>
-          <span className="task-project-kicker">проект</span>
-          <h2
-            className="display"
-            contentEditable
-            suppressContentEditableWarning
-            spellCheck={false}
-            onBlur={(e) => renameProject(e.currentTarget.textContent?.trim() ?? '')}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.currentTarget as HTMLElement).blur(); } }}
-          >
-            {project.name}
-          </h2>
+        <div className="task-project-head">
+          <div className="subject-dot" style={{ background: COLOR_VARS[project.color] || COLOR_VARS.rust }} onClick={cycleColor} title="Сменить цвет" />
+          <div>
+            <span className="task-project-kicker">проект</span>
+            <h2
+              className="display"
+              contentEditable
+              suppressContentEditableWarning
+              spellCheck={false}
+              onBlur={(e) => renameProject(e.currentTarget.textContent?.trim() ?? '')}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.currentTarget as HTMLElement).blur(); } }}
+            >
+              {project.name}
+            </h2>
+          </div>
         </div>
         <button className="task-project-delete" title="Удалить проект" onClick={deleteProject}>×</button>
       </div>
@@ -166,12 +182,12 @@ function ProjectView({ project, onOpenTask }: { project: TaskProject; onOpenTask
         <button onClick={addTask}>Добавить</button>
       </div>
 
-      <div className="task-filter-tabs">
+      <div className="task-filter-tabs" style={{ ['--task-accent' as string]: COLOR_VARS[project.color] || COLOR_VARS.rust }}>
         <button className={'task-filter' + (view === 'current' ? ' active' : '')} onClick={() => setView('current')}>Открытые <span>{currentCount}</span></button>
         <button className={'task-filter' + (view === 'archive' ? ' active' : '')} onClick={() => setView('archive')}>Готовые <span>{archiveCount}</span></button>
       </div>
 
-      <div className="task-list">
+      <div className="task-list" style={{ ['--task-accent' as string]: COLOR_VARS[project.color] || COLOR_VARS.rust }}>
         {items.length === 0 && (
           <div className="task-empty task-empty-small">{view === 'archive' ? 'Готовых шагов пока нет' : 'Все шаги выполнены или список пока пуст'}</div>
         )}
@@ -179,7 +195,7 @@ function ProjectView({ project, onOpenTask }: { project: TaskProject; onOpenTask
           const daysUntil = paymentDaysUntil(item.dueDate);
           const hasNote = !!item.note?.trim();
           return (
-            <div key={item.id} className={'task-row task-row-enter' + (item.done ? ' done' : '')} onClick={() => onOpenTask(item.id)}>
+            <div key={item.id} className={'task-row task-row-enter' + (item.done ? ' done' : '')} style={{ ['--task-accent' as string]: COLOR_VARS[project.color] || COLOR_VARS.rust }} onClick={() => onOpenTask(item.id)}>
               <button className={'task-check' + (item.done ? ' checked' : '')} aria-label={item.done ? 'Вернуть в задачи' : 'Отметить выполненной'} onClick={(e) => { e.stopPropagation(); toggleDone(item.id); }} />
               <div className="task-row-copy">
                 <strong>{item.title}</strong>

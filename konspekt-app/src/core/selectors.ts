@@ -220,16 +220,40 @@ export function todayPaymentsItems(state: AppState, limit = 3) {
     .slice(0, limit);
 }
 
+export function todayPaymentsTotal(state: AppState): number {
+  return state.financeItems.filter((i) => (i.type === 'debt' && !i.done) || i.type === 'income').length;
+}
+
 export function todayNeedsAttention(state: AppState, now = new Date()): boolean {
   return state.financeItems.some((i) => i.type === 'debt' && !i.done && paymentNeedsAttention(i, now));
 }
 
-export function importantOpenTasks(state: AppState, limit = 4) {
+// Насколько задача близка по дедлайну: «скоро» = в пределах 5 дней (включая просроченные).
+export function taskDueSoon(dueDate: string | undefined, now = new Date()): boolean {
+  const d = paymentDaysUntil(dueDate, now);
+  return d !== null && d <= 5;
+}
+
+// Задачи для главной: важные и/или с ближайшим дедлайном (≤ 5 дней).
+// Сначала с дедлайном по возрастанию срока, затем важные, затем новые.
+export function todayTasks(state: AppState, now = new Date(), limit = 4) {
   return state.taskItems
-    .filter((t) => t.important && !t.done)
+    .filter((t) => !t.done && (t.important || taskDueSoon(t.dueDate, now)))
     .slice()
-    .sort((a, b) => b.createdAt - a.createdAt)
+    .sort((a, b) => {
+      const da = a.dueDate ? paymentDaysUntil(a.dueDate, now) : null;
+      const db = b.dueDate ? paymentDaysUntil(b.dueDate, now) : null;
+      if (da !== null && db !== null && da !== db) return da - db;
+      if (da !== null && db === null) return -1;
+      if (da === null && db !== null) return 1;
+      if (a.important !== b.important) return a.important ? -1 : 1;
+      return b.createdAt - a.createdAt;
+    })
     .slice(0, limit);
+}
+
+export function todayTasksTotal(state: AppState, now = new Date()): number {
+  return state.taskItems.filter((t) => !t.done && (t.important || taskDueSoon(t.dueDate, now))).length;
 }
 
 export function wateringDaysAgo(state: AppState, plantId: string, now = new Date()): number | null {
@@ -261,6 +285,10 @@ export function plantsNeedingWater(state: AppState, now = new Date(), limit = 3)
     .slice(0, limit);
 }
 
+export function plantsNeedingWaterTotal(state: AppState, now = new Date()): number {
+  return state.plants.filter((p) => plantNeedsWater(state, p.id, now)).length;
+}
+
 export function importantNotes(state: AppState, limit = 3) {
   return state.noteEntries
     .filter((e) => e.important)
@@ -269,12 +297,20 @@ export function importantNotes(state: AppState, limit = 3) {
     .slice(0, limit);
 }
 
+export function importantNotesTotal(state: AppState): number {
+  return state.noteEntries.filter((e) => e.important).length;
+}
+
 export function topWishes(state: AppState, limit = 3) {
   return state.financeItems
     .filter((i) => i.type === 'wish' && !i.done && Number(i.amount) > 0)
     .slice()
     .sort((a, b) => (Number(b.progress) || 0) / Number(b.amount) - (Number(a.progress) || 0) / Number(a.amount))
     .slice(0, limit);
+}
+
+export function topWishesTotal(state: AppState): number {
+  return state.financeItems.filter((i) => i.type === 'wish' && !i.done && Number(i.amount) > 0).length;
 }
 
 // ---------- Study ----------

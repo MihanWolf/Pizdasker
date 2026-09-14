@@ -1,4 +1,4 @@
-.finance-wrap { padding: 24px 40px 70px; flex: 1; min-height: 0; overflow-y: auto; }
+.finance-wrap { width: 100%; }
 
 .finance-header { margin-bottom: 22px; display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
 .finance-title { font-family: 'Fraunces', serif; font-size: 27px; font-weight: 600; font-style: italic; }

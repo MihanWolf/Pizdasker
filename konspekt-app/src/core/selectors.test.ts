@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateDailyBudget, dailyBudgetColor, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, importantOpenTasks, topWishes, sortTopics, subjectProgress, ungroupedTopics, groupTopics, filteredTopicsForSubject } from './selectors';
+import { calculateDailyBudget, dailyBudgetColor, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, todayTasks, taskDueSoon, topWishes, sortTopics, subjectProgress, ungroupedTopics, groupTopics, filteredTopicsForSubject } from './selectors';
 import { createEmptyState } from './types';
 
 describe('calculateDailyBudget', () => {
@@ -152,16 +152,30 @@ describe('Today dashboard helpers', () => {
     expect(plantNeedsWater(state, 'p1', now)).toBe(true); // 3 дня назад — пора
   });
 
-  it('importantOpenTasks returns only important+undone, newest first, capped at limit', () => {
+  it('todayTasks includes important tasks and tasks due within 5 days, dues first', () => {
     const state = createEmptyState();
+    const now = new Date('2026-09-06T00:00:00');
     state.taskItems = [
       { id: 't1', projectId: 'p', title: 'A', important: true, done: false, createdAt: 1, completedAt: null },
       { id: 't2', projectId: 'p', title: 'B', important: false, done: false, createdAt: 2, completedAt: null },
       { id: 't3', projectId: 'p', title: 'C', important: true, done: true, createdAt: 3, completedAt: 3 },
       { id: 't4', projectId: 'p', title: 'D', important: true, done: false, createdAt: 4, completedAt: null },
+      { id: 't5', projectId: 'p', title: 'E', important: false, done: false, dueDate: '2026-09-09', createdAt: 5, completedAt: null },
+      { id: 't6', projectId: 'p', title: 'F', important: false, done: false, dueDate: '2026-09-20', createdAt: 6, completedAt: null },
     ];
-    const result = importantOpenTasks(state);
-    expect(result.map((t) => t.id)).toEqual(['t4', 't1']);
+    const result = todayTasks(state, now);
+    // E (через 3 дня) — раньше важных A/D; F (через 14 дней) не попадает
+    expect(result.map((t) => t.id)).toEqual(['t5', 't4', 't1']);
+    expect(result.some((t) => t.id === 't2')).toBe(false);
+    expect(result.some((t) => t.id === 't6')).toBe(false);
+  });
+
+  it('taskDueSoon is true within 5 days including overdue', () => {
+    const now = new Date('2026-09-06T00:00:00');
+    expect(taskDueSoon('2026-09-11', now)).toBe(true);
+    expect(taskDueSoon('2026-09-05', now)).toBe(true);
+    expect(taskDueSoon('2026-09-12', now)).toBe(false);
+    expect(taskDueSoon(undefined, now)).toBe(false);
   });
 
   it('topWishes sorts by completion percentage descending', () => {

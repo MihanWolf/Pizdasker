@@ -12,7 +12,7 @@ export function Finance() {
   const wishLeft = remainingTotal(state, 'wish');
 
   return (
-    <div className="finance-wrap">
+    <div className="finance-wrap content-scroll">
       <div className="finance-header">
         <div className="finance-title">Финансы</div>
         <div className="finance-currency">
