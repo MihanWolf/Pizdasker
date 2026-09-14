@@ -22,8 +22,8 @@ export function dailyBudgetColor(value: number, isNegative: boolean): string {
 }
 
 // Порт calculateDailyBudget() из today.js — теперь чистая функция от state,
-// без похода в DOM. Формула из README:
-// (доход - остаток обязательных платежей до даты дохода) / дни до дохода
+// без похода в DOM. Формула:
+// (баланс на руках + доход - остаток обязательных платежей до даты дохода) / дни до дохода
 export function calculateDailyBudget(state: AppState, now = new Date()): DailyBudget {
   const today = new Date(now);
   today.setHours(0, 0, 0, 0);
@@ -42,7 +42,7 @@ export function calculateDailyBudget(state: AppState, now = new Date()): DailyBu
     .filter((i) => i.type === 'debt' && !i.done && i.dueDate && i.dueDate >= todayKey && i.dueDate <= nextIncome.incomeDate)
     .reduce((sum, i) => sum + Math.max(0, (Number(i.amount) || 0) - (Number(i.progress) || 0)), 0);
 
-  const rawValue = ((Number(nextIncome.amount) || 0) - expenses) / daysUntil;
+  const rawValue = ((Number(state.balance) || 0) + (Number(nextIncome.amount) || 0) - expenses) / daysUntil;
   const displayValue = Math.abs(rawValue);
   const isNegative = rawValue < 0;
   return { displayValue, isNegative, color: dailyBudgetColor(displayValue, isNegative) };
@@ -208,9 +208,16 @@ export function paymentAccent(daysUntil: number | null): string {
   return mixHexColors('#9B9270', '#D7D7CA', fade);
 }
 
-export function todayPaymentsItems(state: AppState, limit = 3) {
+// Поступления с прошедшей датой считаются полученными и на главной не показываются.
+export function incomeIsPending(item: FinanceItem, now = new Date()): boolean {
+  if (item.type !== 'income') return false;
+  if (!item.incomeDate) return true;
+  return item.incomeDate >= todayStr(now);
+}
+
+export function todayPaymentsItems(state: AppState, now = new Date(), limit = 3) {
   return state.financeItems
-    .filter((i) => (i.type === 'debt' && !i.done) || i.type === 'income')
+    .filter((i) => (i.type === 'debt' && !i.done) || incomeIsPending(i, now))
     .slice()
     .sort((a, b) => {
       const dateA = a.type === 'income' ? (a.incomeDate || '9999-12-31') : (a.dueDate || '9999-12-31');
@@ -220,8 +227,8 @@ export function todayPaymentsItems(state: AppState, limit = 3) {
     .slice(0, limit);
 }
 
-export function todayPaymentsTotal(state: AppState): number {
-  return state.financeItems.filter((i) => (i.type === 'debt' && !i.done) || i.type === 'income').length;
+export function todayPaymentsTotal(state: AppState, now = new Date()): number {
+  return state.financeItems.filter((i) => (i.type === 'debt' && !i.done) || incomeIsPending(i, now)).length;
 }
 
 export function todayNeedsAttention(state: AppState, now = new Date()): boolean {

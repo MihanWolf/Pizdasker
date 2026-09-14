@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateDailyBudget, dailyBudgetColor, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, todayTasks, taskDueSoon, topWishes, sortTopics, subjectProgress, ungroupedTopics, groupTopics, filteredTopicsForSubject } from './selectors';
+import { calculateDailyBudget, dailyBudgetColor, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, todayTasks, taskDueSoon, topWishes, todayPaymentsItems, todayPaymentsTotal, sortTopics, subjectProgress, ungroupedTopics, groupTopics, filteredTopicsForSubject } from './selectors';
 import { createEmptyState } from './types';
 
 describe('calculateDailyBudget', () => {
@@ -20,6 +20,19 @@ describe('calculateDailyBudget', () => {
     // (1000 - 200) / 10 дней = 80
     expect(result.displayValue).toBe(80);
     expect(result.isNegative).toBe(false);
+  });
+
+  it('adds the current balance to the budget numerator', () => {
+    const state = createEmptyState();
+    const now = new Date('2026-09-06T00:00:00');
+    state.balance = 500;
+    state.financeItems = [
+      { id: '1', type: 'income', title: 'Доход', amount: 1000, incomeDate: '2026-09-16', createdAt: 1 },
+      { id: '2', type: 'debt', title: 'Платёж', amount: 200, progress: 0, dueDate: '2026-09-10', done: false, createdAt: 2 },
+    ];
+    const result = calculateDailyBudget(state, now);
+    // (500 + 1000 - 200) / 10 дней = 130
+    expect(result.displayValue).toBe(130);
   });
 
   it('flags negative budget when expenses exceed income', () => {
@@ -223,6 +236,19 @@ describe('finance selectors', () => {
   it('fmtMoney formats using ru-RU grouping', () => {
     expect(fmtMoney(1234).replace(/\s/g, ' ')).toBe('1 234');
     expect(fmtMoney(0)).toBe('0');
+  });
+
+  it('todayPaymentsItems hides incomes with a past date', () => {
+    const state = createEmptyState();
+    const now = new Date('2026-09-10T00:00:00');
+    state.financeItems = [
+      { id: 'past', type: 'income', title: 'Прошлое', amount: 100, incomeDate: '2026-09-01', createdAt: 1 },
+      { id: 'today', type: 'income', title: 'Сегодня', amount: 100, incomeDate: '2026-09-10', createdAt: 2 },
+      { id: 'future', type: 'income', title: 'Будущее', amount: 100, incomeDate: '2026-09-20', createdAt: 3 },
+    ];
+    const ids = todayPaymentsItems(state, now, 10).map((i) => i.id);
+    expect(ids).toEqual(['today', 'future']);
+    expect(todayPaymentsTotal(state, now)).toBe(2);
   });
 });
 describe('filteredTasksForProject', () => {

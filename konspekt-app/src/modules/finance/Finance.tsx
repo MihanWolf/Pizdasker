@@ -29,10 +29,33 @@ export function Finance() {
           >
             {state.currency}
           </span>
-          <span style={{ marginLeft: 10 }}>Осталось оплатить: <b className="mono debt-color">{fmtMoney(debtLeft)} {state.currency}</b></span>
-          <span style={{ marginLeft: 10 }}>Осталось накопить: <b className="mono wish-color">{fmtMoney(wishLeft)} {state.currency}</b></span>
         </div>
       </div>
+
+      <div className="finance-summary">
+        <label className="finance-balance">
+          <span className="finance-balance-label">Сейчас на руках</span>
+          <span className="finance-balance-input">
+            <input
+              type="number"
+              inputMode="decimal"
+              placeholder="0"
+              value={state.balance || ''}
+              onChange={(e) => update((draft) => { draft.balance = Number(e.target.value) || 0; })}
+            />
+            <span className="finance-balance-currency">{state.currency}</span>
+          </span>
+        </label>
+        <div className="finance-summary-item">
+          <span className="finance-summary-label">Осталось оплатить</span>
+          <b className="mono debt-color">{fmtMoney(debtLeft)} {state.currency}</b>
+        </div>
+        <div className="finance-summary-item">
+          <span className="finance-summary-label">Осталось накопить</span>
+          <b className="mono wish-color">{fmtMoney(wishLeft)} {state.currency}</b>
+        </div>
+      </div>
+
       <div className="finance-columns">
         <DebtOrWishSection type="debt" />
         <IncomeSection />

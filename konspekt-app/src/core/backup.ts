@@ -49,6 +49,7 @@ export function importBackup(raw: string): ImportResult {
     notesSearch: parsed.notesSearch ?? '',
     financeItems: parsed.financeItems ?? empty.financeItems,
     currency: parsed.currency ?? empty.currency,
+    balance: typeof parsed.balance === 'number' ? parsed.balance : empty.balance,
     plants: parsed.plants ?? empty.plants,
     waterings: parsed.waterings ?? empty.waterings,
     activePlantId: parsed.activePlantId ?? empty.activePlantId,

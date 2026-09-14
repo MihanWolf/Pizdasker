@@ -144,6 +144,7 @@ export interface AppState {
 
   financeItems: FinanceItem[];
   currency: string;
+  balance: number;
 
   plants: Plant[];
   waterings: Watering[];
@@ -186,6 +187,7 @@ export function createEmptyState(): AppState {
     notesSearch: '',
     financeItems: [],
     currency: '₽',
+    balance: 0,
     plants: [],
     waterings: [],
     activePlantId: null,
