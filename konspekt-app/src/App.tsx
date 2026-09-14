@@ -38,9 +38,9 @@ export default function App() {
 
   return (
     <ConfirmProvider>
-      <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      <div className="app-shell">
         <ModeSwitch />
-        <div style={{ flex: 1, minWidth: 0, height: '100vh', overflowY: 'auto' }}>
+        <div className="app-main">
           <ActiveModule />
         </div>
       </div>

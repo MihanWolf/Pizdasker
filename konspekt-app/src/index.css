@@ -18,3 +18,10 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root { height: 100%; }
 body { font-family: 'Inter', sans-serif; background: var(--paper); color: var(--ink); }
+
+.app-shell { display: flex; height: 100vh; overflow: hidden; }
+.app-main { flex: 1; min-width: 0; height: 100vh; overflow-y: auto; }
+@media (max-width: 720px) {
+  .app-shell { flex-direction: column; }
+  .app-main { height: auto; flex: 1; }
+}
