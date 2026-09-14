@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { useStore } from '../../core/store';
 import { uid, PALETTE, type TaskProject } from '../../core/types';
-import { taskOpenCount, taskProjectItems, filteredTasksForProject } from '../../core/selectors';
+import { taskOpenCount, taskProjectItems, filteredTasksForProject, paymentDaysUntil, paymentDueLabel, paymentAccent } from '../../core/selectors';
 import { useConfirm, useNamePrompt } from '../../ui/ConfirmDialog';
 import { ChecklistIcon } from '../../ui/icons';
+import { TaskDrawer } from './TaskDrawer';
 import './tasks.css';
 
 export function Tasks() {
   const { state, update } = useStore();
   const namePrompt = useNamePrompt();
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
   const project = state.taskProjects.find((p) => p.id === state.activeTaskProjectId) ?? null;
   const projectItems = project ? taskProjectItems(state, project.id) : [];
@@ -62,13 +64,15 @@ export function Tasks() {
           Создай вкладку «Дом», «Работа» или «Личное», а потом добавь в неё шаги.
         </div>
       ) : (
-        <ProjectView project={project} />
+        <ProjectView project={project} onOpenTask={setOpenTaskId} />
       )}
+
+      {openTaskId && <TaskDrawer taskId={openTaskId} onClose={() => setOpenTaskId(null)} />}
     </div>
   );
 }
 
-function ProjectView({ project }: { project: TaskProject }) {
+function ProjectView({ project, onOpenTask }: { project: TaskProject; onOpenTask: (id: string) => void }) {
   const { state, update } = useStore();
   const confirm = useConfirm();
   const [title, setTitle] = useState('');
@@ -80,6 +84,14 @@ function ProjectView({ project }: { project: TaskProject }) {
   const items = filteredTasksForProject(state, project.id, view);
   const currentCount = filteredTasksForProject(state, project.id, 'current').length;
   const archiveCount = filteredTasksForProject(state, project.id, 'archive').length;
+
+  const renameProject = (name: string) => {
+    if (!name) return;
+    update((draft) => {
+      const p = draft.taskProjects.find((x) => x.id === project.id);
+      if (p) p.name = name;
+    });
+  };
 
   const addTask = () => {
     const trimmed = title.trim();
@@ -128,7 +140,16 @@ function ProjectView({ project }: { project: TaskProject }) {
       <div className="task-project-title">
         <div>
           <span className="task-project-kicker">проект</span>
-          <h2 className="display">{project.name}</h2>
+          <h2
+            className="display"
+            contentEditable
+            suppressContentEditableWarning
+            spellCheck={false}
+            onBlur={(e) => renameProject(e.currentTarget.textContent?.trim() ?? '')}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.currentTarget as HTMLElement).blur(); } }}
+          >
+            {project.name}
+          </h2>
         </div>
         <button className="task-project-delete" title="Удалить проект" onClick={deleteProject}>×</button>
       </div>
@@ -154,17 +175,29 @@ function ProjectView({ project }: { project: TaskProject }) {
         {items.length === 0 && (
           <div className="task-empty task-empty-small">{view === 'archive' ? 'Готовых шагов пока нет' : 'Все шаги выполнены или список пока пуст'}</div>
         )}
-        {items.map((item) => (
-          <div key={item.id} className={'task-row task-row-enter' + (item.done ? ' done' : '')}>
-            <button className={'task-check' + (item.done ? ' checked' : '')} aria-label={item.done ? 'Вернуть в задачи' : 'Отметить выполненной'} onClick={() => toggleDone(item.id)} />
-            <div className="task-row-copy">
-              <strong>{item.title}</strong>
-              <small>{item.done ? 'готово' : item.important ? 'важно' : 'шаг проекта'}</small>
+        {items.map((item) => {
+          const daysUntil = paymentDaysUntil(item.dueDate);
+          const hasNote = !!item.note?.trim();
+          return (
+            <div key={item.id} className={'task-row task-row-enter' + (item.done ? ' done' : '')} onClick={() => onOpenTask(item.id)}>
+              <button className={'task-check' + (item.done ? ' checked' : '')} aria-label={item.done ? 'Вернуть в задачи' : 'Отметить выполненной'} onClick={(e) => { e.stopPropagation(); toggleDone(item.id); }} />
+              <div className="task-row-copy">
+                <strong>{item.title}</strong>
+                <small>
+                  <span>{item.done ? 'готово' : item.important ? 'важно' : 'шаг проекта'}</span>
+                  {item.dueDate && (
+                    <span className="task-row-due" style={{ color: item.done ? undefined : paymentAccent(daysUntil) }}>
+                      {paymentDueLabel(daysUntil)}
+                    </span>
+                  )}
+                  {hasNote && <span className="task-row-note">заметка</span>}
+                </small>
+              </div>
+              <button className={'task-important' + (item.important ? ' active' : '')} title={item.important ? 'Убрать из важных' : 'Отметить важной'} onClick={(e) => { e.stopPropagation(); toggleImportant(item.id); }}>★</button>
+              <button className="task-delete" title="Удалить" onClick={(e) => { e.stopPropagation(); remove(item.id); }}>×</button>
             </div>
-            <button className={'task-important' + (item.important ? ' active' : '')} title={item.important ? 'Убрать из важных' : 'Отметить важной'} onClick={() => toggleImportant(item.id)}>★</button>
-            <button className="task-delete" title="Удалить" onClick={() => remove(item.id)}>×</button>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </>
   );

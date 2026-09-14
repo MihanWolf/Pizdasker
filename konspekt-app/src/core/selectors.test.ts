@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateDailyBudget, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, importantOpenTasks, topWishes, sortTopics, subjectProgress, ungroupedTopics, groupTopics, filteredTopicsForSubject } from './selectors';
+import { calculateDailyBudget, dailyBudgetColor, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, importantOpenTasks, topWishes, sortTopics, subjectProgress, ungroupedTopics, groupTopics, filteredTopicsForSubject } from './selectors';
 import { createEmptyState } from './types';
 
 describe('calculateDailyBudget', () => {
@@ -27,10 +27,20 @@ describe('calculateDailyBudget', () => {
     const now = new Date('2026-09-06T00:00:00');
     state.financeItems = [
       { id: '1', type: 'income', title: 'Доход', amount: 100, incomeDate: '2026-09-07', createdAt: 1 },
-      { id: '2', type: 'debt', title: 'Платёж', amount: 500, progress: 0, dueDate: '2026-09-07', done: false, createdAt: 2 },
+      { id: '2', type: 'debt', title: 'Долг', amount: 500, progress: 0, dueDate: '2026-09-07', done: false, createdAt: 2 },
     ];
     const result = calculateDailyBudget(state, now);
     expect(result.isNegative).toBe(true);
+  });
+});
+
+describe('dailyBudgetColor', () => {
+  it('colors zero gray, negative red, low yellow, mid amber, high green', () => {
+    expect(dailyBudgetColor(0, false)).toBe('var(--ink-faint)');
+    expect(dailyBudgetColor(500, true)).toBe('var(--urgent)');
+    expect(dailyBudgetColor(500, false)).toBe('var(--wish)');
+    expect(dailyBudgetColor(900, false)).toBe('var(--amber)');
+    expect(dailyBudgetColor(1500, false)).toBe('var(--forest)');
   });
 });
 

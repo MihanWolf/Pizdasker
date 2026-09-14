@@ -1,0 +1,12 @@
+.task-due-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.task-due-input {
+  border: 1px solid var(--rule); border-radius: 8px; padding: 8px 12px; outline: none;
+  background: rgba(255,255,255,0.55); font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--ink);
+}
+.task-due-input:focus { border-color: var(--ink-soft); }
+.task-due-label { font-size: 11px; color: var(--ink-soft); }
+.task-due-clear {
+  background: none; border: none; color: var(--ink-faint); cursor: pointer; font-size: 16px; line-height: 1;
+  padding: 0 4px; margin-left: auto;
+}
+.task-due-clear:hover { color: var(--urgent); }

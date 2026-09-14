@@ -7,6 +7,18 @@ export function todayStr(d = new Date()): string {
 export interface DailyBudget {
   displayValue: number;
   isNegative: boolean;
+  color: string;
+}
+
+// Цвет дневного лимита:
+// 0 → серый; отрицательный → красный; 1–800 → жёлтый;
+// 800–1000 → янтарный; больше 1000 → зелёный.
+export function dailyBudgetColor(value: number, isNegative: boolean): string {
+  if (isNegative) return 'var(--urgent)';
+  if (value <= 0) return 'var(--ink-faint)';
+  if (value <= 800) return 'var(--wish)';
+  if (value <= 1000) return 'var(--amber)';
+  return 'var(--forest)';
 }
 
 // Порт calculateDailyBudget() из today.js — теперь чистая функция от state,
@@ -21,7 +33,7 @@ export function calculateDailyBudget(state: AppState, now = new Date()): DailyBu
     .filter((i): i is FinanceItem & { incomeDate: string } => i.type === 'income' && !!i.incomeDate && i.incomeDate >= todayKey)
     .sort((a, b) => a.incomeDate.localeCompare(b.incomeDate) || b.createdAt - a.createdAt)[0];
 
-  if (!nextIncome) return { displayValue: 0, isNegative: false };
+  if (!nextIncome) return { displayValue: 0, isNegative: false, color: 'var(--ink-faint)' };
 
   const incomeDate = new Date(nextIncome.incomeDate + 'T00:00:00');
   const daysUntil = Math.max(1, Math.ceil((incomeDate.getTime() - today.getTime()) / 86400000));
@@ -31,7 +43,9 @@ export function calculateDailyBudget(state: AppState, now = new Date()): DailyBu
     .reduce((sum, i) => sum + Math.max(0, (Number(i.amount) || 0) - (Number(i.progress) || 0)), 0);
 
   const rawValue = ((Number(nextIncome.amount) || 0) - expenses) / daysUntil;
-  return { displayValue: Math.abs(rawValue), isNegative: rawValue < 0 };
+  const displayValue = Math.abs(rawValue);
+  const isNegative = rawValue < 0;
+  return { displayValue, isNegative, color: dailyBudgetColor(displayValue, isNegative) };
 }
 
 export function shoppingActiveCount(state: AppState): number {

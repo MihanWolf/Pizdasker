@@ -3,6 +3,7 @@ import { useStore } from '../../core/store';
 import { uid, COLOR_VARS, type Topic } from '../../core/types';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { CheckStroke, FlagIcon } from '../../ui/icons';
+import '../../ui/drawer.css';
 import './detail-drawer.css';
 
 export function DetailDrawer({ topicId, onClose }: { topicId: string; onClose: () => void }) {

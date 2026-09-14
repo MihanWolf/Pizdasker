@@ -37,7 +37,7 @@ export function Today() {
           <h1 className="today-title display">Сегодня</h1>
         </div>
         <div className="today-right-summary">
-          <div className="today-daily-value" style={{ color: budget.isNegative ? 'var(--urgent)' : undefined }}>
+          <div className="today-daily-value" style={{ color: budget.color }}>
             {fmtMoney(Math.round(budget.displayValue))} {state.currency}
           </div>
         </div>

@@ -114,6 +114,8 @@ export interface TaskItem {
   title: string;
   important: boolean;
   done: boolean;
+  dueDate?: string;
+  note?: string;
   createdAt: number;
   completedAt: number | null;
 }
