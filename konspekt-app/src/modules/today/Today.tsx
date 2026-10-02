@@ -7,6 +7,7 @@ import {
   plantsNeedingWater, plantsNeedingWaterTotal, wateringDaysAgo, wateringAccent, daysAgoLabel, latestWateringDate,
   importantNotes, importantNotesTotal,
   topWishes, topWishesTotal,
+  isModeHidden,
 } from '../../core/selectors';
 import { SunIcon, WalletIcon, ChecklistIcon, DropletIcon, QuoteIcon } from '../../ui/icons';
 import './today.css';
@@ -29,11 +30,11 @@ export function Today() {
   const wishes = topWishes(state);
   const wishesTotal = topWishesTotal(state);
 
-  const showPayments = paymentsTotal > 0;
-  const showTasks = tasksTotal > 0;
-  const showPlants = state.plants.length > 0;
-  const showNotes = notesTotal > 0;
-  const showWishes = wishesTotal > 0;
+  const showPayments = paymentsTotal > 0 && !isModeHidden(state, 'finance');
+  const showTasks = tasksTotal > 0 && !isModeHidden(state, 'tasks');
+  const showPlants = state.plants.length > 0 && !isModeHidden(state, 'plants');
+  const showNotes = notesTotal > 0 && !isModeHidden(state, 'notes');
+  const showWishes = wishesTotal > 0 && !isModeHidden(state, 'finance');
 
   return (
     <div className="today-wrap content-scroll">

@@ -1,4 +1,12 @@
-import type { AppState, FinanceItem } from './types';
+import type { AppMode, AppState, FinanceItem, FinanceOperation } from './types';
+
+export function isModeHidden(state: AppState, mode: AppMode): boolean {
+  return state.settings.hiddenModes.includes(mode);
+}
+
+export function isFinanceAdvanced(state: AppState): boolean {
+  return state.settings.financeAdvanced.enabled;
+}
 
 export function todayStr(d = new Date()): string {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -21,29 +29,36 @@ export function dailyBudgetColor(value: number, isNegative: boolean): string {
   return 'var(--forest)';
 }
 
-// Порт calculateDailyBudget() из today.js — теперь чистая функция от state,
-// без похода в DOM. Формула:
-// (баланс на руках + доход - остаток обязательных платежей до даты дохода) / дни до дохода
+// Безопасный дневной лимит до следующего неподтверждённого дохода:
+// (текущие средства на руках - оставшиеся платежи до дохода) / дни.
 export function calculateDailyBudget(state: AppState, now = new Date()): DailyBudget {
   const today = new Date(now);
   today.setHours(0, 0, 0, 0);
   const todayKey = todayStr(today);
 
   const nextIncome = state.financeItems
-    .filter((i): i is FinanceItem & { incomeDate: string } => i.type === 'income' && !!i.incomeDate && i.incomeDate >= todayKey)
+    .filter((i): i is FinanceItem & { incomeDate: string } => i.type === 'income' && !i.confirmed && !!i.incomeDate && i.incomeDate >= todayKey)
     .sort((a, b) => a.incomeDate.localeCompare(b.incomeDate) || b.createdAt - a.createdAt)[0];
 
-  if (!nextIncome) return { displayValue: 0, isNegative: false, color: 'var(--ink-faint)' };
+  const cashOnHand = currentOnHandBalance(state);
+  if (!nextIncome) {
+    const unpaidExpenses = state.financeItems
+      .filter((i) => i.type === 'debt' && !i.done)
+      .reduce((sum, i) => sum + Math.max(0, (Number(i.amount) || 0) - (Number(i.progress) || 0)), 0);
+    const availableBalance = cashOnHand - unpaidExpenses;
+    const isNegative = availableBalance < 0;
+    return { displayValue: availableBalance, isNegative, color: dailyBudgetColor(availableBalance, isNegative) };
+  }
 
   const incomeDate = new Date(nextIncome.incomeDate + 'T00:00:00');
   const daysUntil = Math.max(1, Math.ceil((incomeDate.getTime() - today.getTime()) / 86400000));
 
   const expenses = state.financeItems
-    .filter((i) => i.type === 'debt' && !i.done && i.dueDate && i.dueDate >= todayKey && i.dueDate <= nextIncome.incomeDate)
+    .filter((i) => i.type === 'debt' && !i.done && i.dueDate && i.dueDate <= nextIncome.incomeDate)
     .reduce((sum, i) => sum + Math.max(0, (Number(i.amount) || 0) - (Number(i.progress) || 0)), 0);
 
-  const rawValue = ((Number(state.balance) || 0) + (Number(nextIncome.amount) || 0) - expenses) / daysUntil;
-  const displayValue = Math.abs(rawValue);
+  const rawValue = (cashOnHand - expenses) / daysUntil;
+  const displayValue = rawValue;
   const isNegative = rawValue < 0;
   return { displayValue, isNegative, color: dailyBudgetColor(displayValue, isNegative) };
 }
@@ -167,6 +182,35 @@ export function financeItemsTotal(items: { amount: number }[]): number {
   return items.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
 }
 
+type FinancePaidItem = Pick<FinanceItem, 'amount' | 'progress' | 'done'>;
+
+function financePaidAmount(item: FinancePaidItem): number {
+  if (item.done) return Math.max(0, Number(item.amount) || 0);
+  return Math.max(0, Number(item.progress) || 0);
+}
+
+export function financePaymentBalanceDelta(previous: FinancePaidItem, next: FinancePaidItem): number {
+  return financePaidAmount(previous) - financePaidAmount(next);
+}
+
+export function financeOperationBalanceEffect(operation: FinanceOperation): number {
+  if (operation.kind !== 'expense') return Number(operation.amount) || 0;
+  if (operation.title.toLowerCase().includes('возврат')) return Math.abs(Number(operation.amount) || 0);
+  return -Math.abs(Number(operation.amount) || 0);
+}
+
+export function currentOnHandBalance(state: AppState): number {
+  const confirmedIncome = state.financeItems
+    .filter((i) => i.type === 'income' && i.confirmed)
+    .reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+
+  const confirmedExpenses = state.financeItems
+    .filter((i) => i.type === 'debt' || i.type === 'wish')
+    .reduce((sum, i) => sum + financePaidAmount(i), 0);
+
+  return (Number(state.balance) || 0) + confirmedIncome - confirmedExpenses;
+}
+
 // ---------- Today dashboard ----------
 
 export function paymentDaysUntil(dueDate: string | undefined, now = new Date()): number | null {
@@ -211,13 +255,14 @@ export function paymentAccent(daysUntil: number | null): string {
 // Поступления с прошедшей датой считаются полученными и на главной не показываются.
 export function incomeIsPending(item: FinanceItem, now = new Date()): boolean {
   if (item.type !== 'income') return false;
+  if (item.confirmed) return false;
   if (!item.incomeDate) return true;
   return item.incomeDate >= todayStr(now);
 }
 
 export function todayPaymentsItems(state: AppState, now = new Date(), limit = 3) {
   return state.financeItems
-    .filter((i) => (i.type === 'debt' && !i.done) || incomeIsPending(i, now))
+    .filter((i) => (i.type === 'debt' && !i.done) || (i.type === 'income' && incomeIsPending(i, now)))
     .slice()
     .sort((a, b) => {
       const dateA = a.type === 'income' ? (a.incomeDate || '9999-12-31') : (a.dueDate || '9999-12-31');

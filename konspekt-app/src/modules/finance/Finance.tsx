@@ -1,15 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../../core/store';
-import { uid, type FinanceItem, type FinanceItemType } from '../../core/types';
-import { fmtMoney, formatFinanceDate, remainingTotal, sortedFinanceItems, sortedIncomes, financeItemsTotal } from '../../core/selectors';
+import { uid, type FinanceItem, type FinanceItemType, type FinanceOperation } from '../../core/types';
+import { fmtMoney, formatFinanceDate, remainingTotal, sortedFinanceItems, sortedIncomes, financeItemsTotal, currentOnHandBalance, financePaymentBalanceDelta, financeOperationBalanceEffect } from '../../core/selectors';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { CheckStamp } from '../../ui/icons';
 import './finance.css';
+
+function addFinanceOperation(draft: { financeOperations: FinanceOperation[] }, operation: FinanceOperation) {
+  draft.financeOperations.unshift(operation);
+}
+
+function dailyStamp(date: string | undefined | null): string {
+  if (!date) return new Date().toISOString().slice(0, 10);
+  return date;
+}
 
 export function Finance() {
   const { state, update } = useStore();
   const debtLeft = remainingTotal(state, 'debt');
   const wishLeft = remainingTotal(state, 'wish');
+  const currentBalance = currentOnHandBalance(state);
+  const [view, setView] = useState<'ledger' | 'operations'>('ledger');
+  const [manualBalanceInput, setManualBalanceInput] = useState(String(currentBalance));
+  const previousBalanceRef = useRef(currentBalance);
+
+  useEffect(() => {
+    setManualBalanceInput(String(currentBalance));
+    previousBalanceRef.current = currentBalance;
+  }, [currentBalance]);
 
   return (
     <div className="finance-wrap content-scroll">
@@ -40,8 +58,29 @@ export function Finance() {
               type="number"
               inputMode="decimal"
               placeholder="0"
-              value={state.balance || ''}
-              onChange={(e) => update((draft) => { draft.balance = Number(e.target.value) || 0; })}
+              value={manualBalanceInput}
+              onChange={(e) => setManualBalanceInput(e.target.value)}
+              onBlur={() => {
+                const nextValue = Number(manualBalanceInput) || 0;
+                const previousValue = previousBalanceRef.current;
+                const delta = nextValue - previousValue;
+                if (delta === 0) return;
+
+                update((draft) => {
+                  draft.balance += delta;
+                  draft.financeOperations.unshift({
+                    id: uid(),
+                    kind: 'adjustment',
+                    title: 'Корректировка баланса',
+                    amount: delta,
+                    date: new Date().toISOString().slice(0, 10),
+                    note: 'Ручная корректировка остатка',
+                    createdAt: Date.now(),
+                  });
+                });
+
+                previousBalanceRef.current = nextValue;
+              }}
             />
             <span className="finance-balance-currency">{state.currency}</span>
           </span>
@@ -56,11 +95,151 @@ export function Finance() {
         </div>
       </div>
 
-      <div className="finance-columns">
-        <DebtOrWishSection type="debt" />
-        <IncomeSection />
-        <DebtOrWishSection type="wish" />
+      <div className="finance-section-header" style={{ marginTop: 12 }}>
+        <button className={view === 'ledger' ? 'finance-pill income' : 'finance-pill'} onClick={() => setView('ledger')}>План / факт</button>
+        <button className={view === 'operations' ? 'finance-pill debt' : 'finance-pill'} onClick={() => setView('operations')}>Операции</button>
       </div>
+
+      {view === 'operations' ? (
+        <FinanceOperationsSection />
+      ) : (
+        <div className="finance-columns">
+          <DebtOrWishSection type="debt" />
+          <IncomeSection />
+          <DebtOrWishSection type="wish" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FinanceOperationsSection() {
+  const { state, update } = useStore();
+  const [filter, setFilter] = useState<'all' | 'income' | 'expense' | 'adjustment'>('all');
+  const [manualKind, setManualKind] = useState<'income' | 'expense' | 'adjustment'>('income');
+  const [manualAmount, setManualAmount] = useState('');
+  const [manualNote, setManualNote] = useState('');
+  const [manualDate, setManualDate] = useState(new Date().toISOString().slice(0, 10));
+  const [operationToDelete, setOperationToDelete] = useState<FinanceOperation | null>(null);
+
+  const ops = [...state.financeOperations].sort((a, b) => b.createdAt - a.createdAt);
+  const visibleOps = filter === 'all' ? ops : ops.filter((item) => item.kind === filter);
+
+  const addManualOperation = () => {
+    const amount = Number(manualAmount) || 0;
+    if (!amount) return;
+
+    update((draft) => {
+      const signedAmount = manualKind === 'expense' ? -Math.abs(amount) : manualKind === 'income' ? Math.abs(amount) : amount;
+      const title = manualKind === 'income' ? 'Доход' : manualKind === 'expense' ? 'Оплата' : 'Корректировка баланса';
+      draft.balance += signedAmount;
+      draft.financeOperations.unshift({
+        id: uid(),
+        kind: manualKind,
+        title,
+        amount: signedAmount,
+        date: manualDate,
+        note: manualNote.trim() || undefined,
+        createdAt: Date.now(),
+      });
+    });
+
+    setManualAmount('');
+    setManualNote('');
+    setManualDate(new Date().toISOString().slice(0, 10));
+  };
+
+  const updateOperationNote = (id: string, nextNote: string) => {
+    update((draft) => {
+      const target = draft.financeOperations.find((item) => item.id === id);
+      if (!target) return;
+      target.note = nextNote.trim() || undefined;
+    });
+  };
+
+  const removeOperation = (reverseBalanceEffect: boolean) => {
+    if (!operationToDelete) return;
+    const operationId = operationToDelete.id;
+    const balanceEffect = financeOperationBalanceEffect(operationToDelete);
+    update((draft) => {
+      if (reverseBalanceEffect) draft.balance -= balanceEffect;
+      draft.financeOperations = draft.financeOperations.filter((item) => item.id !== operationId);
+    });
+    setOperationToDelete(null);
+  };
+
+  return (
+    <div className="finance-section">
+      <div className="finance-section-header">
+        <div className="finance-pill income">История операций</div>
+      </div>
+
+      <div className="fin-quick-add" style={{ marginBottom: 14 }}>
+        <select value={manualKind} onChange={(e) => setManualKind(e.target.value as 'income' | 'expense' | 'adjustment')}>
+          <option value="income">Доход</option>
+          <option value="expense">Оплата</option>
+          <option value="adjustment">Корректировка</option>
+        </select>
+        <input type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} aria-label="Дата операции" />
+        <input type="number" placeholder="сумма" value={manualAmount} onChange={(e) => setManualAmount(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addManualOperation()} />
+        <input type="text" placeholder="комментарий" value={manualNote} onChange={(e) => setManualNote(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addManualOperation()} />
+        <button onClick={addManualOperation}>Добавить</button>
+      </div>
+
+      <div className="finance-section-header" style={{ marginBottom: 12 }}>
+        <button className={filter === 'all' ? 'finance-pill income' : 'finance-pill'} onClick={() => setFilter('all')}>Все</button>
+        <button className={filter === 'income' ? 'finance-pill income' : 'finance-pill'} onClick={() => setFilter('income')}>Доходы</button>
+        <button className={filter === 'expense' ? 'finance-pill debt' : 'finance-pill'} onClick={() => setFilter('expense')}>Оплаты</button>
+        <button className={filter === 'adjustment' ? 'finance-pill wish' : 'finance-pill'} onClick={() => setFilter('adjustment')}>Корректировки</button>
+      </div>
+
+      <div className="ledger-list">
+        {visibleOps.length === 0 && (
+          <div className="empty-state"><span className="display">Пока пусто</span>Подтверждённые доходы, оплаты и корректировки появятся здесь</div>
+        )}
+
+        {visibleOps.map((item) => {
+          const signedAmount = financeOperationBalanceEffect(item);
+          return (
+          <div key={item.id} className="ledger-row">
+            <div className="ledger-top">
+              <span className="ledger-title">{item.title}</span>
+              <div className="ledger-leader" />
+              <span className={'ledger-amount ' + (signedAmount >= 0 ? 'ledger-income' : 'ledger-expense')}>{signedAmount >= 0 ? '+' : '-'}{fmtMoney(Math.abs(signedAmount))}</span>
+              <button className="ledger-del" title="Удалить операцию" onClick={() => setOperationToDelete(item)}>×</button>
+            </div>
+            <div className="ledger-sub">
+              <span className="ledger-sub-label">{item.kind === 'income' ? 'доход' : item.kind === 'expense' ? 'оплата' : 'корректировка'}</span>
+              <span className="ledger-sub-label">{formatFinanceDate(item.date)}</span>
+            </div>
+            <div className="ledger-sub">
+              <input
+                type="text"
+                className="ledger-sub-input"
+                value={item.note ?? ''}
+                placeholder="Комментарий к операции"
+                onChange={(e) => updateOperationNote(item.id, e.target.value)}
+              />
+            </div>
+          </div>
+          );
+        })}
+      </div>
+      {operationToDelete && (
+        <div className="name-editor" onClick={() => setOperationToDelete(null)}>
+          <div className="name-editor-box" onClick={(e) => e.stopPropagation()}>
+            <div className="display" style={{ fontSize: 16 }}>Удалить операцию?</div>
+            <div className="confirm-msg">
+              «{operationToDelete.title}» на {fmtMoney(Math.abs(operationToDelete.amount))} {state.currency}. Выбери, менять ли баланс.
+            </div>
+            <div className="row">
+              <button className="btn-ghost" onClick={() => setOperationToDelete(null)}>Отмена</button>
+              <button className="btn-ghost" onClick={() => removeOperation(false)}>Оставить в балансе</button>
+              <button className="btn-danger" onClick={() => removeOperation(true)}>Убрать из баланса</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -90,7 +269,31 @@ function DebtOrWishSection({ type }: { type: FinanceItemType & ('debt' | 'wish')
   const patch = (id: string, fn: (item: FinanceItem) => void) => {
     update((draft) => {
       const item = draft.financeItems.find((i) => i.id === id);
-      if (item) fn(item);
+      if (!item) return;
+      fn(item);
+    });
+  };
+
+  const commitProgress = (id: string, progress: number) => {
+    update((draft) => {
+      const item = draft.financeItems.find((i) => i.id === id);
+      if (!item) return;
+      const previous = { amount: item.amount, progress: item.progress, done: item.done };
+      item.progress = progress;
+      const balanceDelta = financePaymentBalanceDelta(previous, item);
+      if (balanceDelta !== 0) {
+        const label = item.type === 'debt'
+          ? (balanceDelta < 0 ? 'Оплата' : 'Возврат')
+          : (balanceDelta < 0 ? 'Накопление' : 'Возврат из накоплений');
+        addFinanceOperation(draft, {
+          id: uid(),
+          kind: 'expense',
+          title: `${label}: ${item.title}`,
+          amount: balanceDelta,
+          date: dailyStamp(new Date().toISOString().slice(0, 10)),
+          createdAt: Date.now(),
+        });
+      }
     });
   };
 
@@ -126,7 +329,23 @@ function DebtOrWishSection({ type }: { type: FinanceItemType & ('debt' | 'wish')
           return (
             <div key={item.id} className={'ledger-row' + (item.done ? ' done' : '')} data-type={type}>
               <div className="ledger-top">
-                <div className={'stamp' + (item.done ? ' checked' : '')} title={isDebt ? 'Оплачено' : 'Куплено'} onClick={() => patch(item.id, (i) => { i.done = !i.done; })}>
+                <div className={'stamp' + (item.done ? ' checked' : '')} title={isDebt ? 'Оплачено' : 'Куплено'} onClick={() => update((draft) => {
+                  const target = draft.financeItems.find((i) => i.id === item.id);
+                  if (!target) return;
+                  const previous = { amount: target.amount, progress: target.progress, done: target.done };
+                  target.done = !target.done;
+                  const balanceDelta = financePaymentBalanceDelta(previous, target);
+                  if (balanceDelta !== 0) {
+                    addFinanceOperation(draft, {
+                      id: uid(),
+                      kind: 'expense',
+                      title: `${balanceDelta < 0 ? (isDebt ? 'Оплата' : 'Покупка') : 'Возврат'}: ${target.title}`,
+                      amount: balanceDelta,
+                      date: dailyStamp(new Date().toISOString().slice(0, 10)),
+                      createdAt: Date.now(),
+                    });
+                  }
+                })}>
                   <CheckStamp />
                 </div>
                 <span
@@ -164,9 +383,9 @@ function DebtOrWishSection({ type }: { type: FinanceItemType & ('debt' | 'wish')
                   <input
                     type="number"
                     className="ledger-sub-input"
-                    value={progress || ''}
+                    defaultValue={progress || ''}
                     placeholder="0"
-                    onChange={(e) => patch(item.id, (i) => { i.progress = Number(e.target.value) || 0; })}
+                    onBlur={(e) => commitProgress(item.id, Number(e.currentTarget.value) || 0)}
                   />
                   <div className="ledger-progress-track"><div className="ledger-progress-fill" style={{ width: `${pct}%` }} /></div>
                   <span className="ledger-sub-label">{pct}%</span>
@@ -185,6 +404,7 @@ function IncomeSection() {
   const confirm = useConfirm();
   const [date, setDate] = useState('');
   const [amount, setAmount] = useState('');
+  const [incomeTitle, setIncomeTitle] = useState('');
 
   const incomes = sortedIncomes(state);
   const total = financeItemsTotal(incomes);
@@ -192,9 +412,17 @@ function IncomeSection() {
   const addIncome = () => {
     if (!date || !amount) return;
     update((draft) => {
-      draft.financeItems.unshift({ id: uid(), type: 'income', title: 'Доход', amount: Number(amount) || 0, incomeDate: date, createdAt: Date.now() });
+      draft.financeItems.unshift({
+        id: uid(),
+        type: 'income',
+        title: incomeTitle.trim() || 'Доход',
+        amount: Number(amount) || 0,
+        incomeDate: date,
+        confirmed: false,
+        createdAt: Date.now(),
+      });
     });
-    setDate(''); setAmount('');
+    setDate(''); setAmount(''); setIncomeTitle('');
   };
 
   const remove = async (item: FinanceItem) => {
@@ -210,6 +438,7 @@ function IncomeSection() {
       </div>
 
       <div className="fin-quick-add income-quick-add">
+        <input type="text" placeholder="источник дохода" value={incomeTitle} onChange={(e) => setIncomeTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addIncome()} />
         <label className="fin-due-field"><span>дата</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Дата поступления" /></label>
         <input type="number" placeholder="сумма" value={amount} onChange={(e) => setAmount(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addIncome()} />
         <button onClick={addIncome}>Добавить</button>
@@ -220,7 +449,36 @@ function IncomeSection() {
         {incomes.map((item) => (
           <div key={item.id} className="ledger-row income-row">
             <div className="ledger-top">
-              <span className="ledger-title income-date-label">{formatFinanceDate(item.incomeDate)}</span>
+              <div className={'stamp' + (item.confirmed ? ' checked' : '')} title={item.confirmed ? 'Подтверждено' : 'Подтвердить получение'} onClick={() => update((draft) => {
+                const incoming = draft.financeItems.find((x) => x.id === item.id);
+                if (!incoming) return;
+                if (incoming.confirmed) return;
+                incoming.confirmed = true;
+                addFinanceOperation(draft, {
+                  id: uid(),
+                  kind: 'income',
+                  title: incoming.title || 'Доход',
+                  amount: Number(incoming.amount) || 0,
+                  date: dailyStamp(incoming.incomeDate),
+                  note: 'Доход подтверждён',
+                  createdAt: Date.now(),
+                });
+              })}>
+                <CheckStamp />
+              </div>
+              <span
+                className="ledger-title"
+                contentEditable
+                suppressContentEditableWarning
+                spellCheck={false}
+                onBlur={(e) => update((draft) => {
+                  const income = draft.financeItems.find((x) => x.id === item.id);
+                  if (income) income.title = e.currentTarget.textContent?.trim() || 'Доход';
+                })}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.currentTarget as HTMLElement).blur(); } }}
+              >
+                {item.title || 'Доход'}
+              </span>
               <div className="ledger-leader" />
               <span
                 className="ledger-amount"
@@ -240,6 +498,7 @@ function IncomeSection() {
               </span>
               <button className="ledger-del" title="Удалить" onClick={() => remove(item)}>×</button>
             </div>
+            <div className="ledger-sub"><span className="ledger-sub-label">{formatFinanceDate(item.incomeDate)}</span></div>
           </div>
         ))}
       </div>

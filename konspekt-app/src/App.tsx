@@ -7,6 +7,7 @@ import { Tasks } from './modules/tasks/Tasks';
 import { Finance } from './modules/finance/Finance';
 import { Today } from './modules/today/Today';
 import { Study } from './modules/study/Study';
+import { Settings } from './modules/settings/Settings';
 import { FooterBar } from './modules/BackupBar';
 import { Shelf } from './app/Shelf';
 import { ConfirmProvider } from './ui/ConfirmDialog';
@@ -20,6 +21,7 @@ function ActiveModule() {
   if (mode === 'tasks') return <Tasks />;
   if (mode === 'finance') return <Finance />;
   if (mode === 'study') return <Study />;
+  if (mode === 'settings') return <Settings />;
   return (
     <div style={{ padding: 40, color: 'var(--ink-faint)', fontFamily: 'monospace', fontSize: 13 }}>
       Этот раздел ещё не перенесён на React — на очереди по плану миграции.

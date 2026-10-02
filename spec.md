@@ -31,6 +31,7 @@ JSON-бэкапа.
 | Заметки | `notes` | `modules/notes/Notes.tsx` | ✅ перенесён |
 | Полив | `plants` | `modules/plants/Plants.tsx` | ✅ перенесён |
 | Учёба | `study` | `modules/study/Study.tsx` | ✅ перенесён |
+| Настройки | `settings` | `modules/settings/Settings.tsx` | ✅ разделы + финансы |
 | Обряд первого запуска | `onboarding` | — | ❌ не перенесён (данные сохраняются) |
 
 ---
@@ -103,6 +104,7 @@ app/ ui/   — клей: навигация, диалоги, общие комп
 | `src/core/backup.ts` | `exportBackup()` / `importBackup()` |
 | `src/core/backup.test.ts` | Тесты совместимости бэкапов |
 | `src/app/Shelf.tsx` | Единая полка: иконки режимов + корешки активного раздела + «+» |
+| `src/app/modes.tsx` | `NAV_MODES`: единый список разделов для полки и настроек |
 | `src/app/TopBar.tsx` | Общая шапка раздела: цветная точка, inline-имя, мета, удаление |
 | `src/ui/icons.tsx` | Inline-SVG иконки (режимы, флаг, штамп-галочка) |
 | `src/ui/ConfirmDialog.tsx` | `ConfirmProvider` + хуки `useConfirm()`, `useNamePrompt()` |
@@ -125,7 +127,10 @@ app/ ui/   — клей: навигация, диалоги, общие комп
 type ColorName = 'teal' | 'rust' | 'plum' | 'mustard' | 'slate' | 'forest';
 type FinanceItemType = 'debt' | 'wish' | 'income';
 type AppMode = 'today' | 'notes' | 'finance' | 'plants'
-             | 'shopping' | 'tasks' | 'study';
+             | 'shopping' | 'tasks' | 'study' | 'settings';
+
+const APP_MODES: AppMode[];      // все режимы в порядке полки
+const HIDEABLE_MODES: AppMode[]; // все, кроме today и settings
 
 const PALETTE: ColorName[] = ['teal','rust','plum','mustard','slate','forest'];
 
@@ -173,7 +178,7 @@ interface Plant { id: string; name: string; color: ColorName; createdAt: number;
 interface FertAmounts { micro: number|null; grow: number|null; bloom: number|null; ripen: number|null; }
 interface Watering {
   id: string; plantId: string; date: string;
-  water: number|null; ph: number|null;
+  water: number|null; ph: number|null; ppm?: number|null;
   fert: FertAmounts; note: string; createdAt: number;
 }
 
@@ -189,6 +194,14 @@ interface TaskItem {
 }
 
 interface OnboardingState { active: boolean; scene: string; }
+
+interface FinanceAdvanced { enabled: boolean; }
+interface AppSettings {
+  hiddenModes: AppMode[];        // скрытые разделы полки
+  financeAdvanced: FinanceAdvanced;
+}
+// defaultSettings() — дефолты; normalizeSettings(raw) — санитизация любых входных
+// данных: чистит hiddenModes от невалидных и от today/settings.
 ```
 
 ### 4.3. Корневое состояние
@@ -223,6 +236,8 @@ interface AppState {
   taskItems: TaskItem[];
   activeTaskProjectId: string | null;
   tasksView: 'current' | 'archive';
+
+  settings: AppSettings;
 
   onboarding: OnboardingState;            // совместимость со старой версией
 }
@@ -288,7 +303,9 @@ interface Store {
   не «висят» на удалённых элементах.
 - `withActiveIdFallbacks(s)` (экспортируется) для каждого списка с активным
   элементом оставляет валидный id, иначе подставляет первый элемент или
-  `null`. Тесты — `store.test.ts`.
+  `null`. Та же функция нормализует `settings` (`normalizeSettings`) и
+  откатывает `mode` на `'today'`, если активный раздел скрыт. Тесты —
+  `store.test.ts`.
 
 ---
 
@@ -360,6 +377,12 @@ interface Store {
 `subjectTopics`, `subjectProgress`, `subjectGroups`, `ungroupedTopics`,
 `groupTopics`, `filteredTopicsForSubject` (поиск по `title + note`).
 
+### 6.8. Настройки
+
+`isModeHidden(state, mode)` — скрыт ли раздел; `isFinanceAdvanced(state)` —
+включён ли продвинутый режим финансов. Обе — чистые функции, тесты в
+`selectors.test.ts`.
+
 ---
 
 ## 7. UI и навигация
@@ -385,8 +408,11 @@ interface Store {
 
 **`Shelf.tsx`** — единая полка (аналог `#shelf` из старой версии):
 
-- Сверху вертикальный `mode-switch` с иконками: `today → tasks → finance →
-  shopping → notes → plants → study` (порядок как в старом `renderShelf()`).
+- Сверху вертикальный `mode-switch` с иконками: `today → finance → tasks →
+  shopping → notes → plants → study` (список `NAV_MODES`, порядок как в
+  `renderShelf()`). Скрытые разделы не отрисовываются.
+- Внизу — отдельная кнопка «Настройки» (шестерёнка): на десктопе прижата к
+  нижнему краю полки, на мобильной ширине — к правому углу.
 - Разделитель `.shelf-divider`.
 - Ниже — «корешки» активного раздела: для `study`/`notes`/`plants`
   отрисовываются списки (`spine` с названием вертикально и счётчиком) и
@@ -471,9 +497,9 @@ interface Store {
   (`state.activePlantId`, персистентно).
 - `TopBar`: последний полив (`daysAgoLabel` с иконкой-каплей), удаление
   растения (каскадно удаляет `waterings`).
-- Быстрое добавление полива: дата, вода (л), pH, удобрения TriPart
-  (Micro/Grow/Bloom/Ripen), заметка.
-- Строка полива: inline-редактирование даты/воды/pH, разворачиваемые
+- Быстрое добавление полива: дата, вода (л), pH, PPM, удобрения TriPart
+  (Grow/Micro/Bloom/Ripen), заметка.
+- Строка полива: inline-редактирование даты/воды/pH/PPM, разворачиваемые
   удобрения, заметка, удаление.
 - Поиск по журналу (`state.plantsSearch`).
 
@@ -501,6 +527,19 @@ interface Store {
   «Выучено»/«Срочно» (с SVG-иконками), поля «Зачем это нужно» и «Разбор и
   материал», список ссылок (нормализация URL до `https://`),
   добавление/удаление ссылок, удаление темы.
+
+### 8.8. Настройки — `Settings.tsx`
+
+- Секция **«Разделы»**: тумблеры для `HIDEABLE_MODES` в порядке полки.
+  Скрытый раздел пропадает из `Shelf`, а все его виджеты исчезают с
+  «Главной» («Сегодня» и «Настройки» скрыть нельзя).
+- Секция **«Финансы»**: мастер-выключатель «Продвинутый режим»
+  (`settings.financeAdvanced.enabled`). Поля/вкладки/типы доходов
+  подключаются отдельной итерацией — объект расширяется без миграций.
+- Стили — `settings.css` (`.settings-*`), кастомный switch, inline-иконки
+  разделов из `NAV_MODES`.
+- Единый список разделов — `app/modes.tsx` (`NAV_MODES`): один источник
+  правды для кнопок полки и тумблеров настроек.
 
 ---
 

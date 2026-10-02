@@ -64,7 +64,20 @@ export interface FinanceItem {
   progress?: number;
   dueDate?: string;
   incomeDate?: string;
+  confirmed?: boolean;
   done?: boolean;
+  createdAt: number;
+}
+
+export type FinanceOperationKind = 'income' | 'expense' | 'adjustment';
+
+export interface FinanceOperation {
+  id: string;
+  kind: FinanceOperationKind;
+  title: string;
+  amount: number;
+  date: string;
+  note?: string;
   createdAt: number;
 }
 
@@ -88,6 +101,7 @@ export interface Watering {
   date: string;
   water: number | null;
   ph: number | null;
+  ppm?: number | null;
   fert: FertAmounts;
   note: string;
   createdAt: number;
@@ -120,7 +134,41 @@ export interface TaskItem {
   completedAt: number | null;
 }
 
-export type AppMode = 'today' | 'notes' | 'finance' | 'plants' | 'shopping' | 'tasks' | 'study';
+export type AppMode = 'today' | 'notes' | 'finance' | 'plants' | 'shopping' | 'tasks' | 'study' | 'settings';
+
+export const APP_MODES: AppMode[] = ['today', 'finance', 'tasks', 'shopping', 'notes', 'plants', 'study', 'settings'];
+
+// «Сегодня» и «Настройки» скрывать нельзя: первая — дом, вторая — вход в настройки.
+export const HIDEABLE_MODES: AppMode[] = ['finance', 'tasks', 'shopping', 'notes', 'plants', 'study'];
+
+export interface FinanceAdvanced {
+  enabled: boolean;
+}
+
+export interface AppSettings {
+  hiddenModes: AppMode[];
+  financeAdvanced: FinanceAdvanced;
+}
+
+export function defaultSettings(): AppSettings {
+  return { hiddenModes: [], financeAdvanced: { enabled: false } };
+}
+
+// Приводит произвольные (в т.ч. из старого бэкапа) настройки к корректному виду.
+export function normalizeSettings(raw: unknown): AppSettings {
+  const base = defaultSettings();
+  if (!raw || typeof raw !== 'object') return base;
+  const r = raw as Partial<AppSettings>;
+  const hidden = Array.isArray(r.hiddenModes)
+    ? r.hiddenModes.filter((m): m is AppMode => HIDEABLE_MODES.includes(m as AppMode))
+    : base.hiddenModes;
+  return {
+    hiddenModes: Array.from(new Set(hidden)),
+    financeAdvanced: {
+      enabled: typeof r.financeAdvanced?.enabled === 'boolean' ? r.financeAdvanced.enabled : false,
+    },
+  };
+}
 
 export interface OnboardingState {
   active: boolean;
@@ -143,6 +191,7 @@ export interface AppState {
   notesSearch: string;
 
   financeItems: FinanceItem[];
+  financeOperations: FinanceOperation[];
   currency: string;
   balance: number;
 
@@ -158,6 +207,8 @@ export interface AppState {
   taskItems: TaskItem[];
   activeTaskProjectId: string | null;
   tasksView: 'current' | 'archive';
+
+  settings: AppSettings;
 
   onboarding: OnboardingState;
 }
@@ -186,6 +237,7 @@ export function createEmptyState(): AppState {
     activeNotePageId: null,
     notesSearch: '',
     financeItems: [],
+    financeOperations: [],
     currency: '₽',
     balance: 0,
     plants: [],
@@ -198,6 +250,7 @@ export function createEmptyState(): AppState {
     taskItems: [],
     activeTaskProjectId: null,
     tasksView: 'current',
+    settings: defaultSettings(),
     onboarding: { active: true, scene: 'birth' },
   };
 }

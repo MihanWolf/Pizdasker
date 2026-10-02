@@ -42,3 +42,34 @@ describe('withActiveIdFallbacks', () => {
     expect(result.activeTaskProjectId).toBeNull();
   });
 });
+
+describe('withActiveIdFallbacks — settings sanitization', () => {
+  it('drops invalid and un-hideable modes from hiddenModes', () => {
+    const state = createEmptyState();
+    state.settings.hiddenModes = ['finance', 'today', 'settings', 'nonsense' as never, 'finance'];
+    const result = withActiveIdFallbacks(state);
+    expect(result.settings.hiddenModes).toEqual(['finance']);
+  });
+
+  it('falls back to today when the active mode is hidden', () => {
+    const state = createEmptyState();
+    state.mode = 'plants';
+    state.settings.hiddenModes = ['plants'];
+    expect(withActiveIdFallbacks(state).mode).toBe('today');
+
+    state.mode = 'settings';
+    state.settings.hiddenModes = ['plants'];
+    expect(withActiveIdFallbacks(state).mode).toBe('settings');
+
+    state.mode = 'plants';
+    state.settings.hiddenModes = [];
+    expect(withActiveIdFallbacks(state).mode).toBe('plants');
+  });
+
+  it('restores defaults when settings are missing', () => {
+    const state = createEmptyState();
+    state.settings = undefined as never;
+    const result = withActiveIdFallbacks(state);
+    expect(result.settings).toEqual({ hiddenModes: [], financeAdvanced: { enabled: false } });
+  });
+});

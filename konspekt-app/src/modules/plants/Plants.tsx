@@ -8,8 +8,8 @@ import { DropletIcon } from '../../ui/icons';
 import './plants.css';
 
 const FERT_KEYS: [keyof FertAmounts, string][] = [
-  ['micro', 'Micro'],
   ['grow', 'Grow'],
+  ['micro', 'Micro'],
   ['bloom', 'Bloom'],
   ['ripen', 'Ripen'],
 ];
@@ -100,6 +100,7 @@ function QuickAddWatering({ plantId }: { plantId: string }) {
   const [date, setDate] = useState(todayStr());
   const [water, setWater] = useState('');
   const [ph, setPh] = useState('');
+  const [ppm, setPpm] = useState('');
   const [fert, setFert] = useState<Record<string, string>>({});
   const [note, setNote] = useState('');
 
@@ -116,12 +117,13 @@ function QuickAddWatering({ plantId }: { plantId: string }) {
         date: date || todayStr(),
         water: water ? Number(water) : null,
         ph: ph ? Number(ph) : null,
+        ppm: ppm ? Number(ppm) : null,
         fert: fertAmounts,
         note: note.trim(),
         createdAt: Date.now(),
       });
     });
-    setWater(''); setPh(''); setNote(''); setFert({}); setDate(todayStr());
+    setWater(''); setPh(''); setPpm(''); setNote(''); setFert({}); setDate(todayStr());
   };
 
   return (
@@ -129,6 +131,7 @@ function QuickAddWatering({ plantId }: { plantId: string }) {
       <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
       <input type="number" step="0.1" placeholder="вода, л" value={water} onChange={(e) => setWater(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
       <input type="number" step="0.1" placeholder="pH" value={ph} onChange={(e) => setPh(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
+      <input type="number" step="1" placeholder="PPM" value={ppm} onChange={(e) => setPpm(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
       <div className="fert-inputs">
         {FERT_KEYS.map(([key, label]) => (
           <div className="fert-field" key={key}>
@@ -187,6 +190,19 @@ function WateringRow({ entry, plant }: { entry: Watering; plant: Plant }) {
           }}
         >
           {entry.ph != null ? `pH ${entry.ph}` : ''}
+        </span>
+        <span
+          className="watering-pill ppm"
+          contentEditable
+          suppressContentEditableWarning
+          spellCheck={false}
+          data-placeholder="+ PPM"
+          onBlur={(e) => {
+            const raw = (e.currentTarget.textContent || '').replace(/[^\d.,]/g, '').replace(',', '.');
+            patch({ ppm: raw ? Number(raw) : null });
+          }}
+        >
+          {entry.ppm != null ? `PPM ${entry.ppm}` : ''}
         </span>
         <button className="watering-del" title="Удалить" onClick={remove}>×</button>
       </div>

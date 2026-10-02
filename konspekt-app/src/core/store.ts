@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { AppState } from './types';
-import { createEmptyState } from './types';
+import { createEmptyState, normalizeSettings } from './types';
 import { loadRawState, saveRawState } from './storage';
 
 interface SaveStatus {
@@ -60,8 +60,12 @@ function pickActive<T extends { id: string }>(items: T[], activeId: string | nul
 }
 
 export function withActiveIdFallbacks(s: AppState): AppState {
+  const settings = normalizeSettings(s.settings);
+  const mode = settings.hiddenModes.includes(s.mode) ? 'today' : s.mode;
   return {
     ...s,
+    mode,
+    settings,
     activeSubjectId: pickActive(s.subjects, s.activeSubjectId),
     activeNotePageId: pickActive(s.notePages, s.activeNotePageId),
     activePlantId: pickActive(s.plants, s.activePlantId),

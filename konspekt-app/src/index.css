@@ -85,6 +85,7 @@ body {
 .mode-btn svg { width: 18px; height: 18px; }
 .mode-btn:hover { background: rgba(255,255,255,0.7); color: var(--ink-soft); }
 .mode-btn.active { background: var(--ink); color: #F4F3EC; }
+.settings-btn { margin-top: auto; }
 .shelf-divider { width: 40px; height: 1px; background: var(--rule); margin-bottom: 10px; flex-shrink: 0; }
 
 /* ---------- MAIN AREA ---------- */
@@ -268,5 +269,6 @@ body {
   .add-subject-btn { width: 40px; height: 36px; }
   .topbar, .searchbar, .content-scroll { padding-left: 18px; padding-right: 18px; }
   .mode-switch { flex-direction: row; margin-bottom: 0; margin-right: 4px; }
+  .settings-btn { margin-top: 0; margin-left: auto; }
   .shelf-divider { width: 1px; height: 32px; margin-bottom: 0; margin-right: 6px; }
 }

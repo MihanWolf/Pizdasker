@@ -1,5 +1,5 @@
 import type { AppState } from './types';
-import { createEmptyState } from './types';
+import { createEmptyState, normalizeSettings } from './types';
 
 // Формат бэкапа не менялся между версиями: это тот же снимок, что делает
 // snapshotState() в старом app.js (+ exportedAt). Поэтому JSON, выгруженный
@@ -13,6 +13,7 @@ function hasAnyUserData(s: AppState): boolean {
     s.subjects.length ||
     s.notePages.length ||
     s.financeItems.length ||
+    s.financeOperations.length ||
     s.plants.length ||
     s.shoppingItems.length ||
     s.taskProjects.length ||
@@ -33,7 +34,7 @@ export function importBackup(raw: string): ImportResult {
   const empty = createEmptyState();
 
   const state: AppState = {
-    mode: (['today', 'notes', 'finance', 'plants', 'shopping', 'tasks', 'study'] as const).includes(
+    mode: (['today', 'notes', 'finance', 'plants', 'shopping', 'tasks', 'study', 'settings'] as const).includes(
       parsed.mode as AppState['mode']
     )
       ? (parsed.mode as AppState['mode'])
@@ -48,6 +49,7 @@ export function importBackup(raw: string): ImportResult {
     activeNotePageId: parsed.activeNotePageId ?? empty.activeNotePageId,
     notesSearch: parsed.notesSearch ?? '',
     financeItems: parsed.financeItems ?? empty.financeItems,
+    financeOperations: parsed.financeOperations ?? empty.financeOperations,
     currency: parsed.currency ?? empty.currency,
     balance: typeof parsed.balance === 'number' ? parsed.balance : empty.balance,
     plants: parsed.plants ?? empty.plants,
@@ -60,6 +62,7 @@ export function importBackup(raw: string): ImportResult {
     taskItems: Array.isArray(parsed.taskItems) ? parsed.taskItems : empty.taskItems,
     activeTaskProjectId: parsed.activeTaskProjectId ?? (parsed.taskProjects?.[0]?.id ?? null),
     tasksView: parsed.tasksView === 'archive' ? 'archive' : 'current',
+    settings: normalizeSettings(parsed.settings),
     onboarding:
       parsed.onboarding && typeof parsed.onboarding.active === 'boolean'
         ? parsed.onboarding

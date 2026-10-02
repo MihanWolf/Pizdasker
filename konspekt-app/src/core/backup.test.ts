@@ -56,4 +56,20 @@ describe('importBackup (legacy compatibility)', () => {
     const { state: reimported } = importBackup(exported);
     expect(reimported.shoppingItems).toEqual(original.shoppingItems);
   });
+
+  it('defaults settings for backups that predate them', () => {
+    const { state } = importBackup(legacyExportSample);
+    expect(state.settings).toEqual({ hiddenModes: [], financeAdvanced: { enabled: false } });
+  });
+
+  it('sanitizes settings and round-trips valid ones', () => {
+    const original = createEmptyState();
+    original.settings.hiddenModes = ['finance'];
+    original.settings.financeAdvanced.enabled = true;
+    const { state: reimported } = importBackup(exportBackup(original));
+    expect(reimported.settings).toEqual({ hiddenModes: ['finance'], financeAdvanced: { enabled: true } });
+
+    const { state: dirty } = importBackup('{"settings":{"hiddenModes":["today","bogus"],"financeAdvanced":{}}}');
+    expect(dirty.settings).toEqual({ hiddenModes: [], financeAdvanced: { enabled: false } });
+  });
 });

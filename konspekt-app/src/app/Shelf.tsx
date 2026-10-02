@@ -1,22 +1,15 @@
 import { useStore } from '../core/store';
-import { uid, COLOR_VARS, PALETTE, type AppMode } from '../core/types';
-import { subjectProgress } from '../core/selectors';
+import { uid, COLOR_VARS, PALETTE } from '../core/types';
+import { subjectProgress, isModeHidden } from '../core/selectors';
 import { useNamePrompt } from '../ui/ConfirmDialog';
-import { SunIcon, ChecklistIcon, WalletIcon, BagIcon, QuoteIcon, DropletIcon, BookIcon } from '../ui/icons';
-
-const MODE_BUTTONS: { mode: AppMode; title: string; icon: React.ReactNode }[] = [
-  { mode: 'today', title: 'Главная', icon: <SunIcon /> },
-  { mode: 'finance', title: 'Финансы', icon: <WalletIcon /> },
-  { mode: 'tasks', title: 'Задачи', icon: <ChecklistIcon /> },
-  { mode: 'shopping', title: 'Покупки', icon: <BagIcon /> },
-  { mode: 'notes', title: 'Заметки', icon: <QuoteIcon /> },
-  { mode: 'plants', title: 'Полив', icon: <DropletIcon /> },
-  { mode: 'study', title: 'Учёба', icon: <BookIcon /> },
-];
+import { GearIcon } from '../ui/icons';
+import { NAV_MODES } from './modes';
 
 export function Shelf() {
   const { state, update } = useStore();
   const namePrompt = useNamePrompt();
+
+  const modeButtons = NAV_MODES.filter(({ mode }) => !isModeHidden(state, mode));
 
   const addSubject = async () => {
     const name = await namePrompt('Новый предмет', 'Например, История');
@@ -42,7 +35,7 @@ export function Shelf() {
   return (
     <aside className="shelf">
       <nav className="mode-switch">
-        {MODE_BUTTONS.map(({ mode, title, icon }) => (
+        {modeButtons.map(({ mode, title, icon }) => (
           <button
             key={mode}
             className={'mode-btn' + (state.mode === mode ? ' active' : '')}
@@ -116,6 +109,15 @@ export function Shelf() {
           <button className="add-subject-btn" title="Добавить растение" onClick={addPlant}>+</button>
         </>
       )}
+
+      <button
+        className={'mode-btn settings-btn' + (state.mode === 'settings' ? ' active' : '')}
+        title="Настройки"
+        aria-label="Настройки"
+        onClick={() => update((draft) => { draft.mode = 'settings'; })}
+      >
+        <GearIcon />
+      </button>
     </aside>
   );
 }

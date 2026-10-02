@@ -50,6 +50,7 @@
 }
 .watering-pill:focus { border-bottom: 1px dashed var(--ink-faint); }
 .watering-pill.ph { background: rgba(185,85,42,0.12); color: var(--rust); }
+.watering-pill.ppm { background: rgba(63,120,74,0.12); color: var(--forest); }
 .watering-pill:empty::before { content: attr(data-placeholder); color: var(--ink-faint); font-style: italic; }
 
 .fert-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
