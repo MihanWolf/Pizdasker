@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../../core/store';
 import { uid, type FinanceItem, type FinanceItemType, type FinanceOperation } from '../../core/types';
-import { fmtMoney, formatFinanceDate, remainingTotal, sortedFinanceItems, sortedIncomes, financeItemsTotal, currentOnHandBalance, financePaymentBalanceDelta, financeOperationBalanceEffect } from '../../core/selectors';
+import { fmtMoney, formatFinanceDate, remainingTotal, sortedFinanceItems, sortedIncomes, financeItemsTotal, currentOnHandBalance, financePaymentBalanceDelta, financeOperationBalanceEffect, nearestPlannedFinanceIncome } from '../../core/selectors';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { CheckStamp } from '../../ui/icons';
 import './finance.css';
@@ -19,6 +19,7 @@ export function Finance() {
   const { state, update } = useStore();
   const debtLeft = remainingTotal(state, 'debt');
   const wishLeft = remainingTotal(state, 'wish');
+  const nearestIncome = nearestPlannedFinanceIncome(state);
   const currentBalance = currentOnHandBalance(state);
   const [view, setView] = useState<'ledger' | 'operations'>('ledger');
   const [manualBalanceInput, setManualBalanceInput] = useState(String(currentBalance));
@@ -30,7 +31,7 @@ export function Finance() {
   }, [currentBalance]);
 
   return (
-    <div className="finance-wrap content-scroll">
+    <div className={'finance-wrap content-scroll' + (view === 'operations' ? ' finance-wrap-operations' : '')}>
       <div className="finance-header">
         <div className="finance-title">Финансы</div>
         <div className="finance-currency">
@@ -93,11 +94,22 @@ export function Finance() {
           <span className="finance-summary-label">Осталось накопить</span>
           <b className="mono wish-color">{fmtMoney(wishLeft)} {state.currency}</b>
         </div>
+        <div className="finance-summary-item finance-next-income">
+          <span className="finance-summary-label">Ближайшее поступление</span>
+          {nearestIncome ? (
+            <>
+              <b className="mono income-color">{fmtMoney(nearestIncome.amount)} {state.currency}</b>
+              <span className="finance-summary-date">{formatFinanceDate(nearestIncome.date)} · {nearestIncome.title}</span>
+            </>
+          ) : (
+            <b className="finance-summary-muted">Не запланирован</b>
+          )}
+        </div>
       </div>
 
-      <div className="finance-section-header" style={{ marginTop: 12 }}>
-        <button className={view === 'ledger' ? 'finance-pill income' : 'finance-pill'} onClick={() => setView('ledger')}>План / факт</button>
-        <button className={view === 'operations' ? 'finance-pill debt' : 'finance-pill'} onClick={() => setView('operations')}>Операции</button>
+      <div className="finance-view-switch" role="tablist" aria-label="Раздел финансов">
+        <button role="tab" aria-selected={view === 'ledger'} className={view === 'ledger' ? 'active' : ''} onClick={() => setView('ledger')}>План / факт</button>
+        <button role="tab" aria-selected={view === 'operations'} className={view === 'operations' ? 'active' : ''} onClick={() => setView('operations')}>Операции</button>
       </div>
 
       {view === 'operations' ? (
@@ -116,10 +128,11 @@ export function Finance() {
 function FinanceOperationsSection() {
   const { state, update } = useStore();
   const [filter, setFilter] = useState<'all' | 'income' | 'expense' | 'adjustment'>('all');
-  const [manualKind, setManualKind] = useState<'income' | 'expense' | 'adjustment'>('income');
+  const [manualKind, setManualKind] = useState<'income' | 'expense' | 'adjustment'>('expense');
+  const [manualTitle, setManualTitle] = useState('');
   const [manualAmount, setManualAmount] = useState('');
-  const [manualNote, setManualNote] = useState('');
   const [manualDate, setManualDate] = useState(new Date().toISOString().slice(0, 10));
+  const [manualNote, setManualNote] = useState('');
   const [operationToDelete, setOperationToDelete] = useState<FinanceOperation | null>(null);
 
   const ops = [...state.financeOperations].sort((a, b) => b.createdAt - a.createdAt);
@@ -127,16 +140,17 @@ function FinanceOperationsSection() {
 
   const addManualOperation = () => {
     const amount = Number(manualAmount) || 0;
-    if (!amount) return;
+    const title = manualTitle.trim();
+    if (!amount || (manualKind !== 'adjustment' && !title)) return;
 
     update((draft) => {
       const signedAmount = manualKind === 'expense' ? -Math.abs(amount) : manualKind === 'income' ? Math.abs(amount) : amount;
-      const title = manualKind === 'income' ? 'Доход' : manualKind === 'expense' ? 'Оплата' : 'Корректировка баланса';
-      draft.balance += signedAmount;
+      const operationTitle = title || 'Корректировка баланса';
+          draft.balance += signedAmount;
       draft.financeOperations.unshift({
         id: uid(),
         kind: manualKind,
-        title,
+        title: operationTitle,
         amount: signedAmount,
         date: manualDate,
         note: manualNote.trim() || undefined,
@@ -144,9 +158,10 @@ function FinanceOperationsSection() {
       });
     });
 
+    setManualTitle('');
     setManualAmount('');
-    setManualNote('');
     setManualDate(new Date().toISOString().slice(0, 10));
+    setManualNote('');
   };
 
   const updateOperationNote = (id: string, nextNote: string) => {
@@ -169,31 +184,19 @@ function FinanceOperationsSection() {
   };
 
   return (
-    <div className="finance-section">
+    <div className="finance-section finance-operations">
       <div className="finance-section-header">
         <div className="finance-pill income">История операций</div>
       </div>
 
-      <div className="fin-quick-add" style={{ marginBottom: 14 }}>
-        <select value={manualKind} onChange={(e) => setManualKind(e.target.value as 'income' | 'expense' | 'adjustment')}>
-          <option value="income">Доход</option>
-          <option value="expense">Оплата</option>
-          <option value="adjustment">Корректировка</option>
-        </select>
-        <input type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} aria-label="Дата операции" />
-        <input type="number" placeholder="сумма" value={manualAmount} onChange={(e) => setManualAmount(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addManualOperation()} />
-        <input type="text" placeholder="комментарий" value={manualNote} onChange={(e) => setManualNote(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addManualOperation()} />
-        <button onClick={addManualOperation}>Добавить</button>
+      <div className="finance-operation-filters" aria-label="Фильтр операций">
+        <button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>Все</button>
+        <button className={filter === 'income' ? 'active income' : ''} onClick={() => setFilter('income')}>Доходы</button>
+        <button className={filter === 'expense' ? 'active expense' : ''} onClick={() => setFilter('expense')}>Оплаты</button>
+        <button className={filter === 'adjustment' ? 'active adjustment' : ''} onClick={() => setFilter('adjustment')}>Корректировки</button>
       </div>
 
-      <div className="finance-section-header" style={{ marginBottom: 12 }}>
-        <button className={filter === 'all' ? 'finance-pill income' : 'finance-pill'} onClick={() => setFilter('all')}>Все</button>
-        <button className={filter === 'income' ? 'finance-pill income' : 'finance-pill'} onClick={() => setFilter('income')}>Доходы</button>
-        <button className={filter === 'expense' ? 'finance-pill debt' : 'finance-pill'} onClick={() => setFilter('expense')}>Оплаты</button>
-        <button className={filter === 'adjustment' ? 'finance-pill wish' : 'finance-pill'} onClick={() => setFilter('adjustment')}>Корректировки</button>
-      </div>
-
-      <div className="ledger-list">
+      <div className="ledger-list finance-operation-list">
         {visibleOps.length === 0 && (
           <div className="empty-state"><span className="display">Пока пусто</span>Подтверждённые доходы, оплаты и корректировки появятся здесь</div>
         )}
@@ -225,6 +228,60 @@ function FinanceOperationsSection() {
           );
         })}
       </div>
+      <form className="finance-quick-operation" onSubmit={(event) => { event.preventDefault(); addManualOperation(); }}>
+        <div className="finance-quick-operation-head">
+          <div>
+            <h2>Быстрая операция</h2>
+            <span>Сразу обновит сумму на руках</span>
+          </div>
+          <div className="finance-operation-kind" role="group" aria-label="Тип операции">
+            <button type="button" className={manualKind === 'expense' ? 'active expense' : ''} onClick={() => setManualKind('expense')}>Расход</button>
+            <button type="button" className={manualKind === 'income' ? 'active income' : ''} onClick={() => setManualKind('income')}>Доход</button>
+            <button type="button" className={manualKind === 'adjustment' ? 'active adjustment' : ''} onClick={() => setManualKind('adjustment')}>Другое</button>
+          </div>
+        </div>
+        <div className="finance-quick-operation-fields">
+          <input
+            className="finance-operation-title"
+            type="text"
+            placeholder={manualKind === 'adjustment' ? 'Название корректировки (необязательно)' : 'Название, например «булочка»'}
+            value={manualTitle}
+            onChange={(event) => setManualTitle(event.target.value)}
+            aria-label="Название операции"
+            required={manualKind !== 'adjustment'}
+          />
+          <label className="finance-operation-amount">
+            <span>Сумма</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="0.01"
+              placeholder="0"
+              value={manualAmount}
+              onChange={(event) => setManualAmount(event.target.value)}
+              aria-label="Сумма операции"
+              required
+            />
+            <b>{state.currency}</b>
+          </label>
+          <label className="finance-operation-date">
+            <span>Дата</span>
+            <input type="date" value={manualDate} onChange={(event) => setManualDate(event.target.value)} aria-label="Дата операции" required />
+          </label>
+          <input
+            className="finance-operation-note"
+            type="text"
+            placeholder="Комментарий (необязательно)"
+            value={manualNote}
+            onChange={(event) => setManualNote(event.target.value)}
+            aria-label="Комментарий к операции"
+          />
+          <button className="finance-operation-submit" type="submit" disabled={!manualAmount || !manualDate || (manualKind !== 'adjustment' && !manualTitle.trim())}>
+            Добавить {manualKind === 'income' ? 'доход' : manualKind === 'expense' ? 'расход' : 'операцию'}
+          </button>
+        </div>
+      </form>
       {operationToDelete && (
         <div className="name-editor" onClick={() => setOperationToDelete(null)}>
           <div className="name-editor-box" onClick={(e) => e.stopPropagation()}>

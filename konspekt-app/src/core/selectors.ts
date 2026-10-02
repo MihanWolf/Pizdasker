@@ -178,6 +178,34 @@ export function sortedIncomes(state: AppState) {
     });
 }
 
+export function nearestUnpaidFinancePayment(state: AppState, now = new Date()): { title: string; date: string; amount: number } | null {
+  const today = todayStr(now);
+  const unpaid = state.financeItems.filter((item) => item.type === 'debt' && !item.done && !!item.dueDate);
+  const next = unpaid
+    .filter((item) => item.dueDate! >= today)
+    .sort((a, b) => a.dueDate!.localeCompare(b.dueDate!) || a.createdAt - b.createdAt)[0]
+    ?? unpaid
+      .filter((item) => item.dueDate! < today)
+      .sort((a, b) => b.dueDate!.localeCompare(a.dueDate!) || b.createdAt - a.createdAt)[0];
+
+  if (!next?.dueDate) return null;
+  return {
+    title: next.title,
+    date: next.dueDate,
+    amount: Math.max(0, (Number(next.amount) || 0) - (Number(next.progress) || 0)),
+  };
+}
+
+export function nearestPlannedFinanceIncome(state: AppState, now = new Date()): { title: string; date: string; amount: number } | null {
+  const today = todayStr(now);
+  const next = state.financeItems
+    .filter((item): item is FinanceItem & { incomeDate: string } => item.type === 'income' && !item.confirmed && !!item.incomeDate && item.incomeDate >= today)
+    .sort((a, b) => a.incomeDate.localeCompare(b.incomeDate) || a.createdAt - b.createdAt)[0];
+
+  if (!next) return null;
+  return { title: next.title, date: next.incomeDate, amount: Number(next.amount) || 0 };
+}
+
 export function financeItemsTotal(items: { amount: number }[]): number {
   return items.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
 }

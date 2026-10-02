@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateDailyBudget, dailyBudgetColor, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, todayTasks, taskDueSoon, topWishes, todayPaymentsItems, todayPaymentsTotal, sortTopics, subjectProgress, ungroupedTopics, groupTopics, filteredTopicsForSubject, isModeHidden, isFinanceAdvanced, currentOnHandBalance, financePaymentBalanceDelta, financeOperationBalanceEffect } from './selectors';
+import { calculateDailyBudget, dailyBudgetColor, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, todayTasks, taskDueSoon, topWishes, todayPaymentsItems, todayPaymentsTotal, sortTopics, subjectProgress, ungroupedTopics, groupTopics, filteredTopicsForSubject, isModeHidden, isFinanceAdvanced, currentOnHandBalance, financePaymentBalanceDelta, financeOperationBalanceEffect, nearestUnpaidFinancePayment, nearestPlannedFinanceIncome } from './selectors';
 import { createEmptyState } from './types';
 
 describe('calculateDailyBudget', () => {
@@ -117,6 +117,53 @@ describe('calculateDailyBudget', () => {
     expect(result.isNegative).toBe(true);
     expect(result.displayValue).toBe(-400);
     expect(result.color).toBe('var(--urgent)');
+  });
+});
+
+describe('nearestUnpaidFinancePayment', () => {
+  it('returns nearest upcoming unpaid payment and the remaining balance', () => {
+    const state = createEmptyState();
+    state.financeItems = [
+      { id: 'later', type: 'debt', title: 'Аренда', amount: 1000, progress: 0, dueDate: '2026-10-12', createdAt: 1 },
+      { id: 'nearest', type: 'debt', title: 'Интернет', amount: 800, progress: 300, dueDate: '2026-10-05', createdAt: 2 },
+      { id: 'done', type: 'debt', title: 'Закрыт', amount: 500, dueDate: '2026-10-03', done: true, createdAt: 3 },
+    ];
+
+    expect(nearestUnpaidFinancePayment(state, new Date('2026-10-02T00:00:00'))).toEqual({
+      title: 'Интернет',
+      date: '2026-10-05',
+      amount: 500,
+    });
+  });
+
+  it('falls back to the most recent overdue unpaid payment', () => {
+    const state = createEmptyState();
+    state.financeItems = [
+      { id: 'overdue', type: 'debt', title: 'Кредит', amount: 2000, progress: 500, dueDate: '2026-09-20', createdAt: 1 },
+    ];
+    expect(nearestUnpaidFinancePayment(state, new Date('2026-10-02T00:00:00'))).toEqual({
+      title: 'Кредит',
+      date: '2026-09-20',
+      amount: 1500,
+    });
+  });
+});
+
+describe('nearestPlannedFinanceIncome', () => {
+  it('returns the nearest future unconfirmed income and ignores past or confirmed income', () => {
+    const state = createEmptyState();
+    state.financeItems = [
+      { id: 'later', type: 'income', title: 'Подработка', amount: 2000, incomeDate: '2026-10-12', createdAt: 1 },
+      { id: 'next', type: 'income', title: 'Зарплата', amount: 50000, incomeDate: '2026-10-05', createdAt: 2 },
+      { id: 'confirmed', type: 'income', title: 'Получено', amount: 3000, incomeDate: '2026-10-03', confirmed: true, createdAt: 3 },
+      { id: 'past', type: 'income', title: 'Старое', amount: 1000, incomeDate: '2026-10-01', createdAt: 4 },
+    ];
+
+    expect(nearestPlannedFinanceIncome(state, new Date('2026-10-02T00:00:00'))).toEqual({
+      title: 'Зарплата',
+      date: '2026-10-05',
+      amount: 50000,
+    });
   });
 });
 
