@@ -34,7 +34,7 @@ body {
 .mono { font-family: 'JetBrains Mono', monospace; }
 .display { font-family: 'Fraunces', serif; }
 
-.app-shell { display: flex; height: 100vh; width: 100vw; }
+.app-shell { display: flex; height: 100vh; height: 100dvh; width: 100vw; }
 
 /* ---------- SIDEBAR: SHELF OF SPINES ---------- */
 .shelf {
