@@ -1,4 +1,4 @@
-import type { AppMode, AppState, EnvironmentReading, FinanceItem, FinanceOperation, PlantStage, Watering } from './types';
+import type { AppMode, AppState, EnvironmentReading, FinanceItem, FinanceOperation, FinanceOperationKind, PlantStage, Watering } from './types';
 
 export function isModeHidden(state: AppState, mode: AppMode): boolean {
   return state.settings.hiddenModes.includes(mode);
@@ -414,6 +414,12 @@ export function financeOperationBalanceEffect(operation: FinanceOperation): numb
   return -Math.abs(Number(operation.amount) || 0);
 }
 
+export function financeOperationAmount(kind: FinanceOperationKind, amount: number): number {
+  if (kind === 'expense') return -Math.abs(amount);
+  if (kind === 'income') return Math.abs(amount);
+  return amount;
+}
+
 export function currentOnHandBalance(state: AppState): number {
   const confirmedIncome = state.financeItems
     .filter((i) => i.type === 'income' && i.confirmed)
@@ -424,6 +430,168 @@ export function currentOnHandBalance(state: AppState): number {
     .reduce((sum, i) => sum + financePaidAmount(i), 0);
 
   return (Number(state.balance) || 0) + confirmedIncome - confirmedExpenses;
+}
+
+export interface FinanceMonthlyTotals {
+  income: number;
+  expenses: number;
+}
+
+export function financeOperationEffectiveDate(state: AppState, operation: FinanceOperation): string {
+  if (operation.kind !== 'income' || operation.note !== 'Доход подтверждён' || !Number.isFinite(operation.createdAt) || operation.createdAt <= 0) {
+    return operation.date;
+  }
+
+  const isConfirmedPlannedIncome = state.financeItems.some((item) =>
+    item.type === 'income'
+    && item.confirmed
+    && item.incomeDate === operation.date
+    && (item.title || 'Доход') === operation.title
+    && (Number(item.amount) || 0) === financeOperationBalanceEffect(operation),
+  );
+  if (!isConfirmedPlannedIncome) return operation.date;
+
+  const receivedDate = todayStr(new Date(operation.createdAt));
+  return receivedDate < operation.date ? receivedDate : operation.date;
+}
+
+export interface FinanceWeeklyFlowPoint {
+  date: string;
+  label: string;
+  net: number;
+  height: number;
+}
+
+export interface FinanceWeeklyFlow {
+  days: FinanceWeeklyFlowPoint[];
+  net: number;
+}
+
+export interface FinanceUpcomingEvent {
+  id: string;
+  kind: 'payment' | 'income';
+  title: string;
+  date: string;
+  amount: number;
+}
+
+export interface FinancePlanSummary {
+  unpaidTotal: number;
+  unpaidCount: number;
+  upcomingIncomeTotal: number;
+  upcomingIncomeCount: number;
+  savingsTotal: number;
+  savingsGoalCount: number;
+}
+
+export function financePlanSummary(state: AppState, now = new Date()): FinancePlanSummary {
+  const today = todayStr(now);
+  const unpaid = state.financeItems.filter((item) => item.type === 'debt' && !item.done);
+  const upcomingIncomes = state.financeItems.filter((item) =>
+    item.type === 'income' && !item.confirmed && !!item.incomeDate && item.incomeDate >= today,
+  );
+  const activeGoals = state.financeItems.filter((item) => item.type === 'wish' && !item.done);
+  return {
+    unpaidTotal: unpaid.reduce((total, item) => total + Math.max(0, (Number(item.amount) || 0) - (Number(item.progress) || 0)), 0),
+    unpaidCount: unpaid.length,
+    upcomingIncomeTotal: upcomingIncomes.reduce((total, item) => total + (Number(item.amount) || 0), 0),
+    upcomingIncomeCount: upcomingIncomes.length,
+    savingsTotal: activeGoals.reduce((total, item) => total + Math.max(0, (Number(item.amount) || 0) - (Number(item.progress) || 0)), 0),
+    savingsGoalCount: activeGoals.length,
+  };
+}
+
+export function financeMonthlyTotals(state: AppState, now = new Date()): FinanceMonthlyTotals {
+  const today = todayStr(now);
+  const month = today.slice(0, 7);
+  return state.financeOperations.reduce<FinanceMonthlyTotals>((totals, operation) => {
+    const operationDate = financeOperationEffectiveDate(state, operation);
+    if (!operationDate?.startsWith(month) || operationDate > today) return totals;
+    const amount = financeOperationBalanceEffect(operation);
+    if (operation.kind === 'income') totals.income += Math.max(0, amount);
+    if (operation.kind === 'expense') totals.expenses += Math.max(0, -amount);
+    return totals;
+  }, { income: 0, expenses: 0 });
+}
+
+export function financeWeeklyFlow(state: AppState, now = new Date()): FinanceWeeklyFlow {
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const totals = new Map<string, number>();
+  for (const operation of state.financeOperations) {
+    const operationDate = financeOperationEffectiveDate(state, operation);
+    const amount = financeOperationBalanceEffect(operation);
+    totals.set(operationDate, (totals.get(operationDate) ?? 0) + amount);
+  }
+
+  const points = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (6 - index));
+    const key = todayStr(date);
+    return {
+      date: key,
+      label: date.toLocaleDateString('ru-RU', { weekday: 'short' }).replace('.', '').toUpperCase(),
+      net: totals.get(key) ?? 0,
+    };
+  });
+  const max = Math.max(1, ...points.map((point) => Math.abs(point.net)));
+  const days = points.map((point) => ({
+    ...point,
+    height: point.net === 0 ? 7 : Math.max(15, Math.round(Math.abs(point.net) / max * 100)),
+  }));
+  return { days, net: days.reduce((sum, point) => sum + point.net, 0) };
+}
+
+export function financeUpcomingEvents(state: AppState, now = new Date(), limit = 4): FinanceUpcomingEvent[] {
+  const today = todayStr(now);
+  const events: FinanceUpcomingEvent[] = [
+    ...state.financeItems
+      .filter((item) => item.type === 'debt' && !item.done && !!item.dueDate && Number(item.amount) - (Number(item.progress) || 0) > 0)
+      .map((item) => ({
+        id: item.id,
+        kind: 'payment' as const,
+        title: item.title,
+        date: item.dueDate!,
+        amount: Math.max(0, (Number(item.amount) || 0) - (Number(item.progress) || 0)),
+      })),
+    ...state.financeItems
+      .filter((item) => item.type === 'income' && !item.confirmed && !!item.incomeDate && item.incomeDate >= today)
+      .map((item) => ({
+        id: item.id,
+        kind: 'income' as const,
+        title: item.title || 'Доход',
+        date: item.incomeDate!,
+        amount: Number(item.amount) || 0,
+      })),
+  ];
+
+  return events
+    .sort((a, b) => {
+      const aOverdue = a.kind === 'payment' && a.date < today;
+      const bOverdue = b.kind === 'payment' && b.date < today;
+      if (aOverdue !== bOverdue) return aOverdue ? -1 : 1;
+      if (aOverdue && bOverdue) return b.date.localeCompare(a.date);
+      return a.date.localeCompare(b.date);
+    })
+    .slice(0, Math.max(0, limit));
+}
+
+export function financeRecentOperations(state: AppState, limit = 3): FinanceOperation[] {
+  return state.financeOperations
+    .slice()
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, Math.max(0, limit));
+}
+
+export function financeGoalProgress(item: FinanceItem): { saved: number; target: number; remaining: number; percent: number } {
+  const target = Math.max(0, Number(item.amount) || 0);
+  const saved = Math.max(0, Number(item.progress) || 0);
+  return {
+    saved,
+    target,
+    remaining: Math.max(0, target - saved),
+    percent: target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0,
+  };
 }
 
 // ---------- Today dashboard ----------

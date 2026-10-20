@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateDailyBudget, dailyBudgetColor, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, latestWateringStage, plantTimelineStats, dayCountLabel, formatDateDmy, parseDateDmy, environmentChart, latestEnvironmentReading, wateringPhotoEntries, wateringPhotoGroups, plantPhotoCount, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, todayTasks, taskDueSoon, topWishes, todayPaymentsItems, todayPaymentsTotal, sortTopics, subjectProgress, ungroupedTopics, groupTopics, filteredTopicsForSubject, isModeHidden, isFinanceAdvanced, currentOnHandBalance, financePaymentBalanceDelta, financeOperationBalanceEffect, nearestUnpaidFinancePayment, nearestPlannedFinanceIncome } from './selectors';
+import { calculateDailyBudget, dailyBudgetColor, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, latestWateringStage, plantTimelineStats, dayCountLabel, formatDateDmy, parseDateDmy, environmentChart, latestEnvironmentReading, wateringPhotoEntries, wateringPhotoGroups, plantPhotoCount, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, todayTasks, taskDueSoon, topWishes, todayPaymentsItems, todayPaymentsTotal, sortTopics, subjectProgress, ungroupedTopics, groupTopics, filteredTopicsForSubject, isModeHidden, isFinanceAdvanced, currentOnHandBalance, financePaymentBalanceDelta, financeOperationAmount, financeOperationBalanceEffect, financeOperationEffectiveDate, nearestUnpaidFinancePayment, nearestPlannedFinanceIncome, financeMonthlyTotals, financeWeeklyFlow, financeUpcomingEvents, financeRecentOperations, financeGoalProgress, financePlanSummary } from './selectors';
 import { createEmptyState } from './types';
 
 describe('calculateDailyBudget', () => {
@@ -395,6 +395,103 @@ describe('finance selectors', () => {
     expect(financeOperationBalanceEffect({ id: 'new-paid', kind: 'expense', title: 'Оплата: Интернет', amount: -10000, date: '', createdAt: 2 })).toBe(-10000);
     expect(financeOperationBalanceEffect({ id: 'old-return', kind: 'expense', title: 'Возврат по обязательству', amount: -10000, date: '', createdAt: 3 })).toBe(10000);
     expect(financeOperationBalanceEffect({ id: 'new-return', kind: 'expense', title: 'Возврат: Интернет', amount: 10000, date: '', createdAt: 4 })).toBe(10000);
+  });
+
+  it('normalizes operation amounts so incomes add and expenses subtract', () => {
+    expect(financeOperationAmount('expense', 120)).toBe(-120);
+    expect(financeOperationAmount('expense', -120)).toBe(-120);
+    expect(financeOperationAmount('income', -120)).toBe(120);
+    expect(financeOperationAmount('adjustment', -120)).toBe(-120);
+  });
+
+  it('summarizes current-month income and outflows from operation history', () => {
+    const state = createEmptyState();
+    state.financeItems = [
+      { id: 'planned-income', type: 'income', title: 'Зарплата', amount: 50000, incomeDate: '2026-10-25', confirmed: true, createdAt: 1 },
+    ];
+    state.financeOperations = [
+      { id: 'income', kind: 'income', title: 'Зарплата', amount: 50000, date: '2026-10-25', note: 'Доход подтверждён', createdAt: new Date('2026-10-20T12:00:00').getTime() },
+      { id: 'expense', kind: 'expense', title: 'Покупка', amount: -1200, date: '2026-10-11', createdAt: 2 },
+      { id: 'old', kind: 'income', title: 'Сентябрь', amount: 30000, date: '2026-09-30', createdAt: 3 },
+      { id: 'adjustment', kind: 'adjustment', title: 'Корректировка', amount: 250, date: '2026-10-12', createdAt: 4 },
+      { id: 'future', kind: 'income', title: 'Будущий доход', amount: 9000, date: '2026-10-21', createdAt: 5 },
+    ];
+
+    expect(financeOperationEffectiveDate(state, state.financeOperations[0])).toBe('2026-10-20');
+    expect(financeMonthlyTotals(state, new Date('2026-10-20T12:00:00'))).toEqual({ income: 50000, expenses: 1200 });
+  });
+
+  it('builds a normalized seven-day net cashflow series', () => {
+    const state = createEmptyState();
+    state.financeOperations = [
+      { id: 'income', kind: 'income', title: 'Зарплата', amount: 5000, date: '2026-10-20', createdAt: 1 },
+      { id: 'expense', kind: 'expense', title: 'Продукты', amount: -1000, date: '2026-10-20', createdAt: 2 },
+    ];
+    const flow = financeWeeklyFlow(state, new Date('2026-10-20T12:00:00'));
+
+    expect(flow.days).toHaveLength(7);
+    expect(flow.days[0].date).toBe('2026-10-14');
+    expect(flow.days[6]).toMatchObject({ date: '2026-10-20', net: 4000, height: 100 });
+    expect(flow.days.slice(0, 6).every((point) => point.net === 0 && point.height === 7)).toBe(true);
+    expect(flow.net).toBe(4000);
+  });
+
+  it('prioritizes overdue payments and returns upcoming events by date', () => {
+    const state = createEmptyState();
+    state.financeItems = [
+      { id: 'later', type: 'debt', title: 'Позже', amount: 400, dueDate: '2026-10-25', createdAt: 1 },
+      { id: 'overdue', type: 'debt', title: 'Просрочено', amount: 800, progress: 200, dueDate: '2026-10-18', createdAt: 2 },
+      { id: 'income', type: 'income', title: 'Зарплата', amount: 1000, incomeDate: '2026-10-22', createdAt: 3 },
+      { id: 'past-income', type: 'income', title: 'Старый доход', amount: 1000, incomeDate: '2026-10-01', createdAt: 4 },
+    ];
+
+    expect(financeUpcomingEvents(state, new Date('2026-10-20T12:00:00')).map(({ id, amount }) => ({ id, amount }))).toEqual([
+      { id: 'overdue', amount: 600 },
+      { id: 'income', amount: 1000 },
+      { id: 'later', amount: 400 },
+    ]);
+  });
+
+  it('returns recently created operations first, regardless of their operation date', () => {
+    const state = createEmptyState();
+    state.financeOperations = [
+      { id: 'older', kind: 'expense', title: 'Старое', amount: -1, date: '2026-10-19', createdAt: 3 },
+      { id: 'newer-created', kind: 'expense', title: 'Новее создано', amount: -1, date: '2026-10-20', createdAt: 1 },
+      { id: 'same-day-latest', kind: 'income', title: 'Последнее', amount: 1, date: '2026-10-20', createdAt: 2 },
+    ];
+    expect(financeRecentOperations(state, 2).map((operation) => operation.id)).toEqual(['older', 'same-day-latest']);
+  });
+
+  it('calculates a bounded savings goal progress and remaining target', () => {
+    expect(financeGoalProgress({ id: 'goal', type: 'wish', title: 'Цель', amount: 10000, progress: 2500, createdAt: 1 })).toEqual({
+      saved: 2500,
+      target: 10000,
+      remaining: 7500,
+      percent: 25,
+    });
+    expect(financeGoalProgress({ id: 'goal', type: 'wish', title: 'Цель', amount: 0, progress: 20, createdAt: 1 }).percent).toBe(0);
+    expect(financeGoalProgress({ id: 'goal', type: 'wish', title: 'Цель', amount: 100, progress: 120, createdAt: 1 }).percent).toBe(100);
+  });
+
+  it('summarizes unpaid obligations, planned income and active savings goals', () => {
+    const state = createEmptyState();
+    state.financeItems = [
+      { id: 'debt', type: 'debt', title: 'Кредит', amount: 10000, progress: 2500, createdAt: 1 },
+      { id: 'paid', type: 'debt', title: 'Закрыт', amount: 500, done: true, createdAt: 2 },
+      { id: 'income', type: 'income', title: 'Зарплата', amount: 50000, incomeDate: '2026-10-25', createdAt: 3 },
+      { id: 'past-income', type: 'income', title: 'Прошёл', amount: 1000, incomeDate: '2026-10-10', createdAt: 4 },
+      { id: 'goal', type: 'wish', title: 'Отпуск', amount: 20000, progress: 5000, createdAt: 5 },
+      { id: 'done-goal', type: 'wish', title: 'Закрытая цель', amount: 100, done: true, createdAt: 6 },
+    ];
+
+    expect(financePlanSummary(state, new Date('2026-10-20T12:00:00'))).toEqual({
+      unpaidTotal: 7500,
+      unpaidCount: 1,
+      upcomingIncomeTotal: 50000,
+      upcomingIncomeCount: 1,
+      savingsTotal: 15000,
+      savingsGoalCount: 1,
+    });
   });
 
   it('remainingTotal sums (amount - progress) only for undone items', () => {

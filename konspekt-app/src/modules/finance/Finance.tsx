@@ -1,126 +1,78 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useStore } from '../../core/store';
 import { uid, type FinanceItem, type FinanceItemType, type FinanceOperation } from '../../core/types';
-import { fmtMoney, formatFinanceDate, remainingTotal, sortedFinanceItems, sortedIncomes, financeItemsTotal, currentOnHandBalance, financePaymentBalanceDelta, financeOperationBalanceEffect, nearestPlannedFinanceIncome } from '../../core/selectors';
+import { currentOnHandBalance, financeItemsTotal, financeOperationAmount, financeOperationBalanceEffect, financeOperationEffectiveDate, financePaymentBalanceDelta, financePlanSummary, fmtMoney, formatFinanceDate, remainingTotal, sortedFinanceItems, sortedIncomes, todayStr } from '../../core/selectors';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { CheckStamp } from '../../ui/icons';
+import { FinanceOverview } from './FinanceOverview';
 import './finance.css';
 
 function addFinanceOperation(draft: { financeOperations: FinanceOperation[] }, operation: FinanceOperation) {
   draft.financeOperations.unshift(operation);
 }
 
-function dailyStamp(date: string | undefined | null): string {
-  if (!date) return new Date().toISOString().slice(0, 10);
-  return date;
+export function Finance() {
+  const { state } = useStore();
+  const currentBalance = currentOnHandBalance(state);
+  const [view, setView] = useState<'overview' | 'ledger' | 'operations'>('overview');
+
+  if (view === 'overview') return <FinanceOverview key={currentBalance} onNavigate={setView} />;
+  return <FinancePlanPage initialTab={view === 'operations' ? 'operations' : 'planning'} onNavigate={setView} />;
 }
 
-export function Finance() {
-  const { state, update } = useStore();
-  const debtLeft = remainingTotal(state, 'debt');
-  const wishLeft = remainingTotal(state, 'wish');
-  const nearestIncome = nearestPlannedFinanceIncome(state);
-  const currentBalance = currentOnHandBalance(state);
-  const [view, setView] = useState<'ledger' | 'operations'>('ledger');
-  const [manualBalanceInput, setManualBalanceInput] = useState(String(currentBalance));
-  const previousBalanceRef = useRef(currentBalance);
-
-  useEffect(() => {
-    setManualBalanceInput(String(currentBalance));
-    previousBalanceRef.current = currentBalance;
-  }, [currentBalance]);
+function FinancePlanPage({ initialTab, onNavigate }: {
+  initialTab: 'planning' | 'operations';
+  onNavigate: (view: 'overview' | 'ledger' | 'operations') => void;
+}) {
+  const { state } = useStore();
+  const [tab, setTab] = useState(initialTab);
+  const summary = financePlanSummary(state);
+  const incomes = sortedIncomes(state);
+  const plannedIncomes = incomes.filter((item) => !item.confirmed && !!item.incomeDate);
 
   return (
-    <div className={'finance-wrap content-scroll' + (view === 'operations' ? ' finance-wrap-operations' : '')}>
-      <div className="finance-header">
-        <div className="finance-title">Финансы</div>
-        <div className="finance-currency">
-          Валюта:
-          <span
-            contentEditable
-            suppressContentEditableWarning
-            spellCheck={false}
-            onBlur={(e) => {
-              const value = e.currentTarget.textContent?.trim() || state.currency;
-              update((draft) => { draft.currency = value; });
-            }}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.currentTarget as HTMLElement).blur(); } }}
-          >
-            {state.currency}
-          </span>
+    <div className="finance-plan content-scroll">
+      <header className="finance-plan-header">
+        <span className="finance-plan-kicker">ФИНАНСЫ</span>
+        <div className="finance-plan-actions">
+          <span className="finance-plan-currency">{state.currency}</span>
+          <button type="button" onClick={() => onNavigate('overview')}>← Обзор</button>
         </div>
-      </div>
-
-      <div className="finance-summary">
-        <label className="finance-balance">
-          <span className="finance-balance-label">Сейчас на руках</span>
-          <span className="finance-balance-input">
-            <input
-              type="number"
-              inputMode="decimal"
-              placeholder="0"
-              value={manualBalanceInput}
-              onChange={(e) => setManualBalanceInput(e.target.value)}
-              onBlur={() => {
-                const nextValue = Number(manualBalanceInput) || 0;
-                const previousValue = previousBalanceRef.current;
-                const delta = nextValue - previousValue;
-                if (delta === 0) return;
-
-                update((draft) => {
-                  draft.balance += delta;
-                  draft.financeOperations.unshift({
-                    id: uid(),
-                    kind: 'adjustment',
-                    title: 'Корректировка баланса',
-                    amount: delta,
-                    date: new Date().toISOString().slice(0, 10),
-                    note: 'Ручная корректировка остатка',
-                    createdAt: Date.now(),
-                  });
-                });
-
-                previousBalanceRef.current = nextValue;
-              }}
-            />
-            <span className="finance-balance-currency">{state.currency}</span>
-          </span>
-        </label>
-        <div className="finance-summary-item">
-          <span className="finance-summary-label">Осталось оплатить</span>
-          <b className="mono debt-color">{fmtMoney(debtLeft)} {state.currency}</b>
-        </div>
-        <div className="finance-summary-item">
-          <span className="finance-summary-label">Осталось накопить</span>
-          <b className="mono wish-color">{fmtMoney(wishLeft)} {state.currency}</b>
-        </div>
-        <div className="finance-summary-item finance-next-income">
-          <span className="finance-summary-label">Ближайшее поступление</span>
-          {nearestIncome ? (
-            <>
-              <b className="mono income-color">{fmtMoney(nearestIncome.amount)} {state.currency}</b>
-              <span className="finance-summary-date">{formatFinanceDate(nearestIncome.date)} · {nearestIncome.title}</span>
-            </>
-          ) : (
-            <b className="finance-summary-muted">Не запланирован</b>
-          )}
-        </div>
-      </div>
+      </header>
 
       <div className="finance-view-switch" role="tablist" aria-label="Раздел финансов">
-        <button role="tab" aria-selected={view === 'ledger'} className={view === 'ledger' ? 'active' : ''} onClick={() => setView('ledger')}>План / факт</button>
-        <button role="tab" aria-selected={view === 'operations'} className={view === 'operations' ? 'active' : ''} onClick={() => setView('operations')}>Операции</button>
+        <button type="button" role="tab" aria-selected={tab === 'planning'} className={tab === 'planning' ? 'active' : ''} onClick={() => setTab('planning')}>Планирование</button>
+        <button type="button" role="tab" aria-selected={tab === 'operations'} className={tab === 'operations' ? 'active' : ''} onClick={() => setTab('operations')}>Журнал операций</button>
       </div>
 
-      {view === 'operations' ? (
-        <FinanceOperationsSection />
-      ) : (
-        <div className="finance-columns">
-          <DebtOrWishSection type="debt" />
-          <IncomeSection />
-          <DebtOrWishSection type="wish" />
-        </div>
-      )}
+      {tab === 'planning' ? (
+        <>
+          <section className="finance-plan-summary" aria-label="Сводка плана">
+            <div className="finance-plan-stat finance-plan-stat-debt">
+              <span>ОСТАЛОСЬ ЗАПЛАТИТЬ</span>
+              <b>{fmtMoney(summary.unpaidTotal)} {state.currency}</b>
+              <small>{summary.unpaidCount} активных платежей</small>
+            </div>
+            <div className="finance-plan-stat finance-plan-stat-income">
+              <span>ОЖИДАЕМЫЕ ДОХОДЫ</span>
+              <b>{fmtMoney(summary.upcomingIncomeTotal)} {state.currency}</b>
+              <small>{summary.upcomingIncomeCount} запланировано</small>
+            </div>
+            <div className="finance-plan-stat finance-plan-stat-wish">
+              <span>ЦЕЛИ НАКОПЛЕНИЙ</span>
+              <b>{fmtMoney(summary.savingsTotal)} {state.currency}</b>
+              <small>{summary.savingsGoalCount} активных целей</small>
+            </div>
+          </section>
+
+          <div className="finance-plan-sections">
+            <DebtOrWishSection type="debt" />
+            <IncomeSection incomes={plannedIncomes} />
+            <DebtOrWishSection type="wish" />
+          </div>
+          <p className="finance-plan-footnote">Отметь платёж выполненным или подтверди поступление, когда деньги придут.</p>
+        </>
+      ) : <FinanceOperationsSection />}
     </div>
   );
 }
@@ -131,7 +83,7 @@ function FinanceOperationsSection() {
   const [manualKind, setManualKind] = useState<'income' | 'expense' | 'adjustment'>('expense');
   const [manualTitle, setManualTitle] = useState('');
   const [manualAmount, setManualAmount] = useState('');
-  const [manualDate, setManualDate] = useState(new Date().toISOString().slice(0, 10));
+  const [manualDate, setManualDate] = useState(todayStr());
   const [manualNote, setManualNote] = useState('');
   const [operationToDelete, setOperationToDelete] = useState<FinanceOperation | null>(null);
 
@@ -144,9 +96,9 @@ function FinanceOperationsSection() {
     if (!amount || (manualKind !== 'adjustment' && !title)) return;
 
     update((draft) => {
-      const signedAmount = manualKind === 'expense' ? -Math.abs(amount) : manualKind === 'income' ? Math.abs(amount) : amount;
+      const signedAmount = financeOperationAmount(manualKind, amount);
       const operationTitle = title || 'Корректировка баланса';
-          draft.balance += signedAmount;
+      draft.balance += signedAmount;
       draft.financeOperations.unshift({
         id: uid(),
         kind: manualKind,
@@ -160,7 +112,7 @@ function FinanceOperationsSection() {
 
     setManualTitle('');
     setManualAmount('');
-    setManualDate(new Date().toISOString().slice(0, 10));
+    setManualDate(todayStr());
     setManualNote('');
   };
 
@@ -213,7 +165,7 @@ function FinanceOperationsSection() {
             </div>
             <div className="ledger-sub">
               <span className="ledger-sub-label">{item.kind === 'income' ? 'доход' : item.kind === 'expense' ? 'оплата' : 'корректировка'}</span>
-              <span className="ledger-sub-label">{formatFinanceDate(item.date)}</span>
+              <span className="ledger-sub-label">{formatFinanceDate(financeOperationEffectiveDate(state, item))}</span>
             </div>
             <div className="ledger-sub">
               <input
@@ -310,13 +262,14 @@ function DebtOrWishSection({ type }: { type: FinanceItemType & ('debt' | 'wish')
 
   const isDebt = type === 'debt';
   const items = sortedFinanceItems(state, type);
-  const total = financeItemsTotal(items);
+  const total = remainingTotal(state, type);
 
   const addItem = () => {
     const trimmed = title.trim();
-    if (!trimmed) return;
+    const parsedAmount = Number(amount);
+    if (!trimmed || !Number.isFinite(parsedAmount) || parsedAmount <= 0) return;
     const item: FinanceItem = {
-      id: uid(), type, title: trimmed, amount: Number(amount) || 0, progress: 0,
+      id: uid(), type, title: trimmed, amount: parsedAmount, progress: 0,
       dueDate: isDebt ? dueDate : undefined, done: false, createdAt: Date.now(),
     };
     update((draft) => { draft.financeItems.unshift(item); });
@@ -347,7 +300,7 @@ function DebtOrWishSection({ type }: { type: FinanceItemType & ('debt' | 'wish')
           kind: 'expense',
           title: `${label}: ${item.title}`,
           amount: balanceDelta,
-          date: dailyStamp(new Date().toISOString().slice(0, 10)),
+          date: todayStr(),
           createdAt: Date.now(),
         });
       }
@@ -360,20 +313,32 @@ function DebtOrWishSection({ type }: { type: FinanceItemType & ('debt' | 'wish')
   };
 
   return (
-    <div className="finance-section">
+    <section className={`finance-section finance-plan-section finance-plan-${type}`}>
       <div className="finance-section-header">
-        <div className={'finance-pill ' + type}>{isDebt ? 'Обязательные платежи' : 'Желаемое'}</div>
-        {items.length > 0 && <div className="finance-total">всего: {fmtMoney(total)} {state.currency}</div>}
+        <div>
+          <div className={'finance-pill ' + type}>{isDebt ? 'Обязательные платежи' : 'Цели накоплений'}</div>
+          <p className="finance-plan-section-copy">{isDebt ? 'Сроки и оставшиеся суммы — чтобы ничего не упустить.' : 'Планируй крупные покупки и отслеживай накопления.'}</p>
+        </div>
+        {items.length > 0 && <div className="finance-total">{isDebt ? 'осталось' : 'к накоплению'}: {fmtMoney(total)} {state.currency}</div>}
       </div>
 
-      <div className="fin-quick-add">
-        <input placeholder={isDebt ? 'Например, кредит на телефон' : 'Например, новые наушники'} value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addItem()} />
-        <input type="number" placeholder={isDebt ? 'сумма' : 'цена'} value={amount} onChange={(e) => setAmount(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addItem()} />
+      <form className="fin-quick-add finance-plan-add" onSubmit={(event) => { event.preventDefault(); addItem(); }}>
+        <label className="finance-plan-field">
+          <span>{isDebt ? 'Название платежа' : 'Название цели'}</span>
+          <input placeholder={isDebt ? 'Например, аренда квартиры' : 'Например, отпуск'} value={title} onChange={(e) => setTitle(e.target.value)} required />
+        </label>
+        <label className="finance-plan-field">
+          <span>{isDebt ? 'Сумма платежа' : 'Нужно накопить'}</span>
+          <input type="number" min="0.01" step="0.01" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+        </label>
         {isDebt && (
-          <label className="fin-due-field"><span>срок</span><input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} aria-label="Срок платежа" /></label>
+          <label className="finance-plan-field finance-plan-date-field">
+            <span>Срок оплаты · необязательно</span>
+            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          </label>
         )}
-        <button onClick={addItem}>Добавить</button>
-      </div>
+        <button type="submit">＋ Добавить</button>
+      </form>
 
       <div className="ledger-list">
         {items.length === 0 && (
@@ -398,7 +363,7 @@ function DebtOrWishSection({ type }: { type: FinanceItemType & ('debt' | 'wish')
                       kind: 'expense',
                       title: `${balanceDelta < 0 ? (isDebt ? 'Оплата' : 'Покупка') : 'Возврат'}: ${target.title}`,
                       amount: balanceDelta,
-                      date: dailyStamp(new Date().toISOString().slice(0, 10)),
+                      date: todayStr(),
                       createdAt: Date.now(),
                     });
                   }
@@ -452,28 +417,28 @@ function DebtOrWishSection({ type }: { type: FinanceItemType & ('debt' | 'wish')
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }
 
-function IncomeSection() {
+function IncomeSection({ incomes }: { incomes: FinanceItem[] }) {
   const { state, update } = useStore();
   const confirm = useConfirm();
   const [date, setDate] = useState('');
   const [amount, setAmount] = useState('');
   const [incomeTitle, setIncomeTitle] = useState('');
 
-  const incomes = sortedIncomes(state);
   const total = financeItemsTotal(incomes);
 
   const addIncome = () => {
-    if (!date || !amount) return;
+    const parsedAmount = Number(amount);
+    if (!date || !Number.isFinite(parsedAmount) || parsedAmount <= 0) return;
     update((draft) => {
       draft.financeItems.unshift({
         id: uid(),
         type: 'income',
         title: incomeTitle.trim() || 'Доход',
-        amount: Number(amount) || 0,
+        amount: parsedAmount,
         incomeDate: date,
         confirmed: false,
         createdAt: Date.now(),
@@ -488,21 +453,33 @@ function IncomeSection() {
   };
 
   return (
-    <div className="finance-section">
+    <section className="finance-section finance-plan-section finance-plan-income">
       <div className="finance-section-header">
-        <div className="finance-pill income">Доходы</div>
-        {incomes.length > 0 && <div className="finance-total">всего: {fmtMoney(total)} {state.currency}</div>}
+        <div>
+          <div className="finance-pill income">Ожидаемые доходы</div>
+          <p className="finance-plan-section-copy">Добавь поступления заранее — они появятся в обзоре.</p>
+        </div>
+        {incomes.length > 0 && <div className="finance-total">ожидается: {fmtMoney(total)} {state.currency}</div>}
       </div>
 
-      <div className="fin-quick-add income-quick-add">
-        <input type="text" placeholder="источник дохода" value={incomeTitle} onChange={(e) => setIncomeTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addIncome()} />
-        <label className="fin-due-field"><span>дата</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Дата поступления" /></label>
-        <input type="number" placeholder="сумма" value={amount} onChange={(e) => setAmount(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addIncome()} />
-        <button onClick={addIncome}>Добавить</button>
-      </div>
+      <form className="fin-quick-add finance-plan-add finance-plan-income-add" onSubmit={(event) => { event.preventDefault(); addIncome(); }}>
+        <label className="finance-plan-field">
+          <span>Источник дохода</span>
+          <input type="text" placeholder="Например, зарплата" value={incomeTitle} onChange={(e) => setIncomeTitle(e.target.value)} />
+        </label>
+        <label className="finance-plan-field">
+          <span>Дата поступления</span>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+        </label>
+        <label className="finance-plan-field">
+          <span>Сумма дохода</span>
+          <input type="number" min="0.01" step="0.01" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+        </label>
+        <button type="submit">＋ Запланировать</button>
+      </form>
 
       <div className="ledger-list">
-        {incomes.length === 0 && <div className="empty-state"><span className="display">Пока пусто</span>Добавь первое поступление выше</div>}
+        {incomes.length === 0 && <div className="finance-plan-empty"><span>↗</span><b>Нет ожидаемых поступлений</b><small>Запланируй доход, чтобы видеть его рядом с платежами.</small></div>}
         {incomes.map((item) => (
           <div key={item.id} className="ledger-row income-row">
             <div className="ledger-top">
@@ -516,7 +493,7 @@ function IncomeSection() {
                   kind: 'income',
                   title: incoming.title || 'Доход',
                   amount: Number(incoming.amount) || 0,
-                  date: dailyStamp(incoming.incomeDate),
+                  date: todayStr(),
                   note: 'Доход подтверждён',
                   createdAt: Date.now(),
                 });
@@ -559,6 +536,6 @@ function IncomeSection() {
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
