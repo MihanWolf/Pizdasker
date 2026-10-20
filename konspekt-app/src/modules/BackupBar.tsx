@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { useStore } from '../core/store';
-import { DASHBOARD_LABELS, DASHBOARD_MODES, exportDashboardBackup, importBackupFile, replaceDashboardData, type DashboardMode } from '../core/backup';
+import { DASHBOARD_LABELS, exportDashboardBackup, importBackupFile, replaceDashboardData, type DashboardMode } from '../core/backup';
 import { createEmptyState, type AppState } from '../core/types';
 import { todayStr } from '../core/selectors';
 import { useConfirm } from '../ui/ConfirmDialog';
@@ -12,9 +12,6 @@ export function FooterBar() {
   const { state, saveStatus, retrySave, importState } = useStore();
   const confirm = useConfirm();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const dashboardFileInputRef = useRef<HTMLInputElement>(null);
-  const importScopeRef = useRef<'all' | 'dashboard'>('all');
-  const [dashboardMode, setDashboardMode] = useState<DashboardMode>('plants');
 
   const handleExport = async () => {
     try {
@@ -29,11 +26,18 @@ export function FooterBar() {
     }
   };
 
-  const handleImportClick = () => {
-    importScopeRef.current = 'all';
-    fileInputRef.current?.click();
-  };
+  const handleImportClick = () => fileInputRef.current?.click();
   const handleDashboardExport = async () => {
+    const dashboardMode = isDashboardMode(state.mode) ? state.mode : null;
+    if (!dashboardMode) {
+      await confirm({
+        title: 'Нельзя экспортировать этот экран',
+        message: 'Открой один из разделов, чтобы экспортировать только его данные.',
+        confirmLabel: 'Понятно',
+      });
+      return;
+    }
+
     try {
       if (dashboardMode === 'plants') {
         const payload = await exportDashboardArchive(state);
@@ -48,10 +52,6 @@ export function FooterBar() {
         confirmLabel: 'Понятно',
       });
     }
-  };
-  const handleDashboardImportClick = () => {
-    importScopeRef.current = 'dashboard';
-    dashboardFileInputRef.current?.click();
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -79,11 +79,6 @@ export function FooterBar() {
           exportedAt = prepared.exportedAt;
           scope = prepared.scope;
           if (prepared.scope === 'dashboard') dashboard = prepared.mode;
-        }
-        if (scope !== importScopeRef.current) {
-          throw new Error(scope === 'dashboard'
-            ? 'Выбран бэкап одного раздела. Используй кнопку «импорт раздела».'
-            : 'Выбран полный бэкап. Используй кнопку «импорт».');
         }
         if (!isZip && imported.waterings.some((entry) => entry.photoIds?.length)) {
           throw new Error('Бэкап содержит фотографии. Для их восстановления выберите ZIP-архив.');
@@ -148,15 +143,7 @@ export function FooterBar() {
         <button className="footer-btn" onClick={handleExport}>экспорт</button>
         <button className="footer-btn" onClick={handleImportClick}>импорт</button>
         <input ref={fileInputRef} type="file" accept="application/json,.json,application/zip,.zip" style={{ display: 'none' }} onChange={handleFileChange} />
-        <label className="footer-dashboard-picker">
-          <span>Раздел для экспорта</span>
-          <select value={dashboardMode} onChange={(event) => setDashboardMode(event.target.value as DashboardMode)}>
-            {DASHBOARD_MODES.map((mode) => <option key={mode} value={mode}>{DASHBOARD_LABELS[mode]}</option>)}
-          </select>
-        </label>
         <button className="footer-btn" onClick={handleDashboardExport}>экспорт раздела</button>
-        <button className="footer-btn" onClick={handleDashboardImportClick}>импорт раздела</button>
-        <input ref={dashboardFileInputRef} type="file" accept="application/json,.json,application/zip,.zip" style={{ display: 'none' }} onChange={handleFileChange} />
         <button className="footer-reset" onClick={handleReset}>очистить все данные</button>
       </div>
     </div>
@@ -185,4 +172,8 @@ function downloadText(data: string, filename: string) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function isDashboardMode(mode: AppState['mode']): mode is DashboardMode {
+  return mode === 'finance' || mode === 'tasks' || mode === 'shopping' || mode === 'notes' || mode === 'plants' || mode === 'study';
 }
