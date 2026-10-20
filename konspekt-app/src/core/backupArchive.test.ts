@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { strToU8, zipSync } from 'fflate';
 import { createEmptyState } from './types';
 import { parseBackupArchive } from './backupArchive';
-import { exportBackup } from './backup';
+import { exportBackup, exportDashboardBackup } from './backup';
 
 describe('backup archives', () => {
   it('restores an archive manifest and photo blobs with their referenced ids', async () => {
@@ -50,5 +50,33 @@ describe('backup archives', () => {
 
     await expect(parseBackupArchive(missingPhoto)).rejects.toThrow(/отсутствуют 1 фото/);
     await expect(parseBackupArchive(missingManifest)).rejects.toThrow(/нет файла резервной копии/);
+  });
+
+  it('imports a plant dashboard archive with only its attached photos', async () => {
+    const state = createEmptyState();
+    state.plants = [{ id: 'p1', name: 'Монстера', color: 'forest', createdAt: 1 }];
+    state.waterings = [{
+      id: 'w1',
+      plantId: 'p1',
+      date: '2026-10-20',
+      water: null,
+      ph: null,
+      fert: { micro: null, grow: null, bloom: null, ripen: null },
+      note: '',
+      photoIds: ['photo-one'],
+      createdAt: 2,
+    }];
+    const bytes = zipSync({
+      'konspekt-dashboard.json': strToU8(exportDashboardBackup(state, 'plants')),
+      'photos/photo-one.webp': new Uint8Array([1, 2, 3]),
+    });
+
+    const imported = await parseBackupArchive(bytes);
+
+    expect(imported.scope).toBe('dashboard');
+    if (imported.scope !== 'dashboard') throw new Error('Expected dashboard archive');
+    expect(imported.mode).toBe('plants');
+    expect(imported.state.plants).toEqual(state.plants);
+    expect(imported.photos).toHaveLength(1);
   });
 });

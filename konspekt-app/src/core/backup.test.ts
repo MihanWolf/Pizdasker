@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { importBackup, exportBackup } from './backup';
+import { DASHBOARD_MODES, exportBackup, exportDashboardBackup, importBackup, importBackupFile, replaceDashboardData } from './backup';
 import { createEmptyState } from './types';
 
 // Это ровно то, что выгружает footer-export в старой (vanilla) версии —
@@ -119,5 +119,58 @@ describe('importBackup (legacy compatibility)', () => {
 
     const { state: dirty } = importBackup('{"settings":{"hiddenModes":["today","bogus"],"financeAdvanced":{}}}');
     expect(dirty.settings).toEqual({ hiddenModes: [], financeAdvanced: { enabled: false } });
+  });
+
+  it('exports a single dashboard and replaces only that dashboard on import', () => {
+    const exportedState = createEmptyState();
+    exportedState.plants = [{ id: 'plant-new', name: 'Фикус', color: 'forest', createdAt: 1 }];
+    exportedState.waterings = [{
+      id: 'watering-new',
+      plantId: 'plant-new',
+      date: '2026-10-20',
+      water: 1,
+      ph: 6,
+      fert: { micro: null, grow: null, bloom: null, ripen: null },
+      note: '',
+      createdAt: 2,
+    }];
+    exportedState.notePages = [{ id: 'exported-note', name: 'Не переносить', color: 'plum', createdAt: 3 }];
+
+    const exported = exportDashboardBackup(exportedState, 'plants');
+    const parsed = importBackupFile(exported);
+    expect(parsed.scope).toBe('dashboard');
+    if (parsed.scope !== 'dashboard') throw new Error('Expected dashboard backup');
+    expect(parsed.mode).toBe('plants');
+    expect(parsed.state.plants).toEqual(exportedState.plants);
+    expect(parsed.state.notePages).toEqual([]);
+
+    const targetState = createEmptyState();
+    targetState.plants = [{ id: 'plant-old', name: 'Кактус', color: 'rust', createdAt: 4 }];
+    targetState.notePages = [{ id: 'local-note', name: 'Мои заметки', color: 'teal', createdAt: 5 }];
+    const replaced = replaceDashboardData(targetState, parsed.state, parsed.mode);
+
+    expect(replaced.plants).toEqual(exportedState.plants);
+    expect(replaced.waterings).toEqual(exportedState.waterings);
+    expect(replaced.notePages).toEqual(targetState.notePages);
+  });
+
+  it('round-trips an empty export for every standalone dashboard', () => {
+    const state = createEmptyState();
+    for (const mode of DASHBOARD_MODES) {
+      const imported = importBackupFile(exportDashboardBackup(state, mode));
+      expect(imported.scope).toBe('dashboard');
+      if (imported.scope !== 'dashboard') throw new Error('Expected dashboard backup');
+      expect(imported.mode).toBe(mode);
+    }
+  });
+
+  it('keeps full backups distinguishable and rejects incomplete dashboard exports', () => {
+    expect(importBackupFile(exportBackup(createEmptyState())).scope).toBe('all');
+    expect(() => importBackupFile(JSON.stringify({
+      format: 'pizdasker-dashboard',
+      version: 1,
+      mode: 'plants',
+      data: { plants: [], waterings: [] },
+    }))).toThrow(/обязательное поле/);
   });
 });

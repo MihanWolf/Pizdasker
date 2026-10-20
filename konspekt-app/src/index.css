@@ -246,7 +246,12 @@ body {
   background: none; border: none; color: var(--urgent); text-decoration: underline; cursor: pointer; font-size: 11px;
   pointer-events: auto; font-family: 'JetBrains Mono', monospace;
 }
-.footer-actions { display: flex; align-items: center; gap: 14px; pointer-events: auto; }
+.footer-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px 12px; max-width: min(900px, 78vw); pointer-events: auto; }
+.footer-dashboard-picker { display: inline-flex; align-items: center; gap: 5px; color: var(--ink-faint); font: 9px 'JetBrains Mono', monospace; }
+.footer-dashboard-picker select {
+  max-width: 112px; padding: 3px 5px; border: 1px solid var(--rule); border-radius: 5px;
+  background: var(--card); color: var(--ink-soft); font: 10px 'Inter', sans-serif;
+}
 .footer-btn {
   font-size: 10px; color: var(--ink-faint); background: none; border: none; cursor: pointer;
   opacity: .6; pointer-events: auto; font-family: 'JetBrains Mono', monospace;
@@ -256,6 +261,11 @@ body {
 .footer-reset:hover { opacity: 1; color: var(--urgent); }
 
 @media (max-width: 720px) {
+  .footer-bar { align-items: flex-end; flex-direction: column; gap: 5px; padding: 7px 10px; }
+  .footer-actions { width: 100%; max-width: none; gap: 6px 10px; }
+  .footer-dashboard-picker { gap: 4px; }
+  .footer-dashboard-picker select { max-width: 88px; }
+  .footer-reset, .footer-btn { font-size: 9px; }
   .app-shell { flex-direction: column; }
   .shelf {
     width: 100%; height: auto; flex-direction: row; padding: 10px 12px; overflow-x: auto; overflow-y: hidden;
