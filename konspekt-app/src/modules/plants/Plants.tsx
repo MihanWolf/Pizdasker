@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../../core/store';
 import { uid, COLOR_VARS, PLANT_STAGES, type EnvironmentReading, type Plant, type PlantStage, type Watering, type FertAmounts } from '../../core/types';
-import { filteredWateringsForPlant, daysAgoLabel, todayStr, latestWateringDate, latestWateringStage, plantTimelineStats, dayCountLabel, formatDateDmy, parseDateDmy, environmentChart, latestEnvironmentReading, sortedEnvironmentReadings, type EnvironmentChartRange } from '../../core/selectors';
+import { filteredWateringsForPlant, daysAgoLabel, todayStr, latestWateringDate, latestWateringStage, plantTimelineStats, dayCountLabel, formatDateDmy, parseDateDmy, environmentChart, latestEnvironmentReading, sortedEnvironmentReadings, wateringPhotoGroups, plantPhotoCount, type EnvironmentChartRange } from '../../core/selectors';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { TopBar, useCycleColor } from '../../app/TopBar';
 import { DropletIcon } from '../../ui/icons';
+import { deletePlantPhotos, getPlantPhoto, storePlantPhotos } from '../../core/plantPhotoStorage';
 import './plants.css';
 
 const FERT_KEYS: [keyof FertAmounts, string][] = [
@@ -34,6 +35,7 @@ export function Plants() {
             <button onClick={() => update((draft) => { draft.plantsView = 'climate'; })}>
               Климат <span>{state.environmentReadings.length}</span>
             </button>
+            <button disabled>Галерея</button>
           </div>
         </div>
         <div className="content-scroll">
@@ -69,6 +71,17 @@ function PlantView({ plant }: { plant: Plant }) {
       confirmLabel: 'Удалить',
     });
     if (!ok) return;
+    const photoIds = state.waterings.filter((w) => w.plantId === plant.id).flatMap((w) => w.photoIds ?? []);
+    try {
+      await deletePlantPhotos(photoIds);
+    } catch {
+      await confirm({
+        title: 'Не удалось удалить фотографии',
+        message: 'Растение и журнал не удалены. Повторите попытку после проверки локального хранилища.',
+        confirmLabel: 'Понятно',
+      });
+      return;
+    }
     update((draft) => {
       draft.plants = draft.plants.filter((p) => p.id !== plant.id);
       draft.waterings = draft.waterings.filter((w) => w.plantId !== plant.id);
@@ -107,27 +120,34 @@ function PlantView({ plant }: { plant: Plant }) {
         <div className="plants-subtabs">
           <button className={state.plantsView === 'watering' ? 'active' : ''} onClick={() => update((draft) => { draft.plantsView = 'watering'; })}>Полив</button>
           <button className={state.plantsView === 'climate' ? 'active' : ''} onClick={() => update((draft) => { draft.plantsView = 'climate'; })}>Климат <span>{state.environmentReadings.length}</span></button>
+          <button className={state.plantsView === 'gallery' ? 'active' : ''} onClick={() => update((draft) => { draft.plantsView = 'gallery'; })}>Галерея <span>{plantPhotoCount(state, plant.id)}</span></button>
         </div>
-        <input
-          className="search-input"
-          placeholder="Поиск по журналу..."
-          value={search}
-          onChange={(e) => update((draft) => { draft.plantsSearch = e.target.value; })}
-        />
+        {state.plantsView === 'watering' && (
+          <input
+            className="search-input"
+            placeholder="Поиск по журналу..."
+            value={search}
+            onChange={(e) => update((draft) => { draft.plantsSearch = e.target.value; })}
+          />
+        )}
       </div>
 
       <div className="content-scroll">
-        <EnvironmentQuickAdd />
-        {!search && <QuickAddWatering plantId={plant.id} />}
-        {entries.length === 0 ? (
-          <div className="empty-state">
-            <span className="display">{search ? 'Ничего не найдено' : 'Пока пусто'}</span>
-            {search ? 'Попробуй другой запрос' : 'Впиши дату и объём воды выше'}
-          </div>
-        ) : (
-          <div className="waterings-list">
-            {entries.map((entry) => <WateringRow key={entry.id} entry={entry} plant={plant} />)}
-          </div>
+        {state.plantsView === 'gallery' ? <PlantPhotoGallery plantId={plant.id} /> : (
+          <>
+            <EnvironmentQuickAdd />
+            {!search && <QuickAddWatering plantId={plant.id} />}
+            {entries.length === 0 ? (
+              <div className="empty-state">
+                <span className="display">{search ? 'Ничего не найдено' : 'Пока пусто'}</span>
+                {search ? 'Попробуй другой запрос' : 'Впиши дату и объём воды выше'}
+              </div>
+            ) : (
+              <div className="waterings-list">
+                {entries.map((entry) => <WateringRow key={entry.id} entry={entry} plant={plant} />)}
+              </div>
+            )}
+          </>
         )}
       </div>
     </>
@@ -192,6 +212,7 @@ function ClimateView() {
           <button className="active" onClick={() => update((draft) => { draft.plantsView = 'climate'; })}>
             Климат <span>{state.environmentReadings.length}</span>
           </button>
+          {state.activePlantId && <button onClick={() => update((draft) => { draft.plantsView = 'gallery'; })}>Галерея</button>}
         </div>
       </div>
       <div className="content-scroll">
@@ -394,6 +415,8 @@ function toLocalDateTimeInput(date: Date): string {
 
 function QuickAddWatering({ plantId }: { plantId: string }) {
   const { state, update } = useStore();
+  const imagePickerRef = useRef<HTMLInputElement>(null);
+  const cameraPickerRef = useRef<HTMLInputElement>(null);
   const [date, setDate] = useState(formatDateDmy(todayStr()));
   const [water, setWater] = useState('');
   const [ph, setPh] = useState('');
@@ -401,31 +424,61 @@ function QuickAddWatering({ plantId }: { plantId: string }) {
   const [fert, setFert] = useState<Record<string, string>>({});
   const [note, setNote] = useState('');
   const [stage, setStage] = useState<PlantStage | ''>(() => latestWateringStage(state, plantId) ?? '');
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [photoError, setPhotoError] = useState('');
 
-  const submit = () => {
-    if (!stage) return;
+  const addSelectedPhotos = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(event.target.files ?? []);
+    event.target.value = '';
+    const invalid = selected.find((file) => !file.type.startsWith('image/'));
+    if (invalid) {
+      setPhotoError('Можно прикреплять только изображения.');
+      return;
+    }
+    setPhotoError('');
+    setPhotos((current) => [...current, ...selected]);
+  };
+
+  const submit = async () => {
+    if (!stage || saving) return;
     const parsedDate = parseDateDmy(date);
     if (!parsedDate) return;
+    setSaving(true);
+    setPhotoError('');
     const fertAmounts: FertAmounts = {
       micro: fert.micro ? Number(fert.micro) : null,
       grow: fert.grow ? Number(fert.grow) : null,
       bloom: fert.bloom ? Number(fert.bloom) : null,
       ripen: fert.ripen ? Number(fert.ripen) : null,
     };
-    update((draft) => {
-      draft.waterings.unshift({
-        id: uid(), plantId,
-        date: parsedDate,
-        water: water ? Number(water) : null,
-        ph: ph ? Number(ph) : null,
-        ppm: ppm ? Number(ppm) : null,
-        fert: fertAmounts,
-        note: note.trim(),
-        stage,
-        createdAt: Date.now(),
+    try {
+      const storedPhotos = await Promise.all(photos.map(async (file) => ({
+        id: uid(),
+        blob: await preparePhoto(file),
+      })));
+      await storePlantPhotos(storedPhotos);
+      update((draft) => {
+        draft.waterings.unshift({
+          id: uid(), plantId,
+          date: parsedDate,
+          water: water ? Number(water) : null,
+          ph: ph ? Number(ph) : null,
+          ppm: ppm ? Number(ppm) : null,
+          fert: fertAmounts,
+          note: note.trim(),
+          stage,
+          photoIds: storedPhotos.map((photo) => photo.id),
+          createdAt: Date.now(),
+        });
       });
-    });
-    setWater(''); setPh(''); setPpm(''); setNote(''); setFert({}); setDate(formatDateDmy(todayStr()));
+      setWater(''); setPh(''); setPpm(''); setNote(''); setFert({}); setDate(formatDateDmy(todayStr()));
+      setPhotos([]);
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : 'Не удалось сохранить запись и фотографии.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -455,16 +508,164 @@ function QuickAddWatering({ plantId }: { plantId: string }) {
         ))}
       </div>
       <input type="text" placeholder="Заметка" value={note} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
-      <button onClick={submit} disabled={!stage || !parseDateDmy(date)}>Добавить</button>
+      <input ref={imagePickerRef} className="plant-photo-input" type="file" accept="image/*" multiple onChange={addSelectedPhotos} />
+      <input ref={cameraPickerRef} className="plant-photo-input" type="file" accept="image/*" capture="environment" onChange={addSelectedPhotos} />
+      <div className="plant-photo-actions">
+        <button type="button" className="plant-photo-button" onClick={() => imagePickerRef.current?.click()}>Выбрать фото</button>
+        <button type="button" className="plant-photo-button" onClick={() => cameraPickerRef.current?.click()}>Сделать фото</button>
+        {photos.length > 0 && <span className="plant-photo-count">Выбрано: {photos.length}</span>}
+      </div>
+      {photos.length > 0 && (
+        <div className="plant-photo-pending">
+          {photos.map((photo, index) => (
+            <button type="button" key={`${photo.name}-${photo.lastModified}-${index}`} onClick={() => setPhotos((current) => current.filter((_, i) => i !== index))}>
+              {photo.name || `Фото ${index + 1}`} ×
+            </button>
+          ))}
+        </div>
+      )}
+      {photoError && <div className="plant-photo-error" role="alert">{photoError}</div>}
+      <button onClick={submit} disabled={!stage || !parseDateDmy(date) || saving}>{saving ? 'Сохраняю…' : 'Добавить'}</button>
     </div>
   );
 }
 
-function WateringRow({ entry, plant }: { entry: Watering; plant: Plant }) {
+async function preparePhoto(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  try {
+    const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Не удалось подготовить фотографию.');
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const compressed = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error('Не удалось сжать фотографию.'));
+      }, 'image/webp', 0.82);
+    });
+    return compressed;
+  } finally {
+    bitmap.close();
+  }
+}
+
+function PlantPhotoGallery({ plantId }: { plantId: string }) {
+  const { state } = useStore();
+  const groups = wateringPhotoGroups(state, plantId);
+  if (!groups.length) {
+    return <div className="empty-state"><span className="display">Фотографий пока нет</span>Прикрепите фото к новой записи полива</div>;
+  }
+  return (
+    <div className="plant-photo-gallery">
+      {groups.map((group) => (
+        <section className="plant-photo-day" key={group.date}>
+          <h2>{formatDateDmy(group.date)}</h2>
+          {group.entries.map((entry) => (
+            <GalleryWateringPhotos key={entry.id} entry={entry} />
+          ))}
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function GalleryWateringPhotos({ entry }: { entry: Watering }) {
   const { update } = useStore();
+  const confirm = useConfirm();
+  const [error, setError] = useState('');
+
+  const removePhoto = async (photoId: string) => {
+    const ok = await confirm({
+      title: 'Удалить фотографию?',
+      message: 'Фото будет удалено из записи полива без возможности восстановления.',
+      confirmLabel: 'Удалить',
+    });
+    if (!ok) return;
+    try {
+      await deletePlantPhotos([photoId]);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Не удалось удалить файл фотографии.');
+      return;
+    }
+    update((draft) => {
+      const watering = draft.waterings.find((item) => item.id === entry.id);
+      if (watering) watering.photoIds = (watering.photoIds ?? []).filter((id) => id !== photoId);
+    });
+  };
+
+  return (
+    <div className="plant-photo-gallery-entry">
+      <div className="plant-photo-gallery-note">{entry.note || 'Запись полива'}</div>
+      <PhotoStrip photoIds={entry.photoIds ?? []} onRemove={removePhoto} />
+      {error && <div className="plant-photo-error" role="alert">{error}</div>}
+    </div>
+  );
+}
+
+function PhotoStrip({ photoIds, onRemove }: { photoIds: string[]; onRemove?: (id: string) => void }) {
+  const [loadedPhotos, setLoadedPhotos] = useState<{ key: string; photos: { id: string; url: string }[]; error: string }>({
+    key: '',
+    photos: [],
+    error: '',
+  });
+  const [selected, setSelected] = useState<string | null>(null);
+  const photoKey = photoIds.join('|');
+  const photos = loadedPhotos.key === photoKey ? loadedPhotos.photos : [];
+  const error = loadedPhotos.key === photoKey ? loadedPhotos.error : '';
+
+  useEffect(() => {
+    let active = true;
+    let urls: string[] = [];
+    void Promise.all((photoKey ? photoKey.split('|') : []).map(async (id) => {
+      const blob = await getPlantPhoto(id);
+      if (!blob) throw new Error('Фото не найдено в локальном хранилище. Восстановите его из ZIP-бэкапа.');
+      return { id, blob };
+    })).then((loaded) => {
+      urls = loaded.map(({ blob }) => URL.createObjectURL(blob));
+      if (active) setLoadedPhotos({ key: photoKey, photos: loaded.map(({ id }, index) => ({ id, url: urls[index] })), error: '' });
+      else urls.forEach((url) => URL.revokeObjectURL(url));
+    }).catch((cause: unknown) => {
+      if (active) setLoadedPhotos({ key: photoKey, photos: [], error: cause instanceof Error ? cause.message : 'Не удалось загрузить фотографии.' });
+    });
+    return () => {
+      active = false;
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  // photoKey tracks the immutable id list while avoiding refetching for unrelated state updates.
+  }, [photoKey]);
+
+  if (error) return <div className="plant-photo-error" role="alert">{error}</div>;
+  return (
+    <>
+      <div className="plant-photo-strip">
+        {photos.map((photo) => (
+          <div className="plant-photo-thumb" key={photo.id}>
+            <button type="button" onClick={() => setSelected(photo.url)} aria-label="Открыть фотографию">
+              <img src={photo.url} alt="Фото записи полива" />
+            </button>
+            {onRemove && <button type="button" className="plant-photo-remove" onClick={() => onRemove(photo.id)} aria-label="Удалить фотографию">×</button>}
+          </div>
+        ))}
+      </div>
+      {selected && (
+        <div className="plant-photo-lightbox" role="presentation" onClick={() => setSelected(null)}>
+          <button type="button" aria-label="Закрыть просмотр" onClick={() => setSelected(null)}>×</button>
+          <img src={selected} alt="Фотография записи полива" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
+    </>
+  );
+}
+
+function WateringRow({ entry, plant }: { entry: Watering; plant: Plant }) {
+  const { state, update } = useStore();
   const confirm = useConfirm();
   const [fertExpanded, setFertExpanded] = useState(FERT_KEYS.some(([key]) => entry.fert[key]));
   const [dateDraft, setDateDraft] = useState(formatDateDmy(entry.date));
+  const [photoError, setPhotoError] = useState('');
   const dateLabel = formatDateDmy(entry.date);
 
   const patch = (p: Partial<Watering>) => {
@@ -473,7 +674,15 @@ function WateringRow({ entry, plant }: { entry: Watering; plant: Plant }) {
 
   const remove = async () => {
     const ok = await confirm({ title: 'Удалить запись полива?', message: 'Эта запись будет удалена безвозвратно.', confirmLabel: 'Удалить' });
-    if (ok) update((draft) => { draft.waterings = draft.waterings.filter((w) => w.id !== entry.id); });
+    if (!ok) return;
+    const photoIds = state.waterings.find((w) => w.id === entry.id)?.photoIds ?? [];
+    try {
+      await deletePlantPhotos(photoIds);
+    } catch (cause) {
+      setPhotoError(cause instanceof Error ? cause.message : 'Не удалось удалить связанные фото из локального хранилища.');
+      return;
+    }
+    update((draft) => { draft.waterings = draft.waterings.filter((w) => w.id !== entry.id); });
   };
 
   return (
@@ -578,6 +787,8 @@ function WateringRow({ entry, plant }: { entry: Watering; plant: Plant }) {
       >
         {entry.note}
       </div>
+      {entry.photoIds?.length ? <PhotoStrip photoIds={entry.photoIds} /> : null}
+      {photoError && <div className="plant-photo-error" role="alert">{photoError}</div>}
     </div>
   );
 }

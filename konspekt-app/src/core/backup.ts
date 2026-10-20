@@ -58,7 +58,7 @@ export function importBackup(raw: string): ImportResult {
     environmentReadings: Array.isArray(parsed.environmentReadings) ? parsed.environmentReadings : empty.environmentReadings,
     activePlantId: parsed.activePlantId ?? empty.activePlantId,
     plantsSearch: parsed.plantsSearch ?? '',
-    plantsView: parsed.plantsView === 'climate' ? 'climate' : 'watering',
+    plantsView: parsed.plantsView === 'climate' || parsed.plantsView === 'gallery' ? parsed.plantsView : 'watering',
     shoppingItems: Array.isArray(parsed.shoppingItems) ? parsed.shoppingItems : empty.shoppingItems,
     shoppingView: parsed.shoppingView === 'archive' ? 'archive' : 'current',
     taskProjects: Array.isArray(parsed.taskProjects) ? parsed.taskProjects : empty.taskProjects,

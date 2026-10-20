@@ -1,4 +1,4 @@
-import type { AppMode, AppState, EnvironmentReading, FinanceItem, FinanceOperation, PlantStage } from './types';
+import type { AppMode, AppState, EnvironmentReading, FinanceItem, FinanceOperation, PlantStage, Watering } from './types';
 
 export function isModeHidden(state: AppState, mode: AppMode): boolean {
   return state.settings.hiddenModes.includes(mode);
@@ -191,6 +191,29 @@ export function filteredWateringsForPlant(state: AppState, plantId: string, quer
     });
   }
   return entries.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.createdAt - a.createdAt);
+}
+
+export function wateringPhotoEntries(state: AppState, plantId: string): Watering[] {
+  return state.waterings
+    .filter((entry) => entry.plantId === plantId && !!entry.photoIds?.length)
+    .slice()
+    .sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.createdAt - a.createdAt);
+}
+
+export function wateringPhotoGroups(state: AppState, plantId: string): { date: string; entries: Watering[] }[] {
+  const groups = new Map<string, Watering[]>();
+  for (const entry of wateringPhotoEntries(state, plantId)) {
+    const group = groups.get(entry.date);
+    if (group) group.push(entry);
+    else groups.set(entry.date, [entry]);
+  }
+  return Array.from(groups, ([date, entries]) => ({ date, entries }));
+}
+
+export function plantPhotoCount(state: AppState, plantId: string): number {
+  return state.waterings
+    .filter((entry) => entry.plantId === plantId)
+    .reduce((total, entry) => total + (entry.photoIds?.length ?? 0), 0);
 }
 
 export type EnvironmentChartRange = '7d' | '30d' | 'all';

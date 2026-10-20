@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateDailyBudget, dailyBudgetColor, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, latestWateringStage, plantTimelineStats, dayCountLabel, formatDateDmy, parseDateDmy, environmentChart, latestEnvironmentReading, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, todayTasks, taskDueSoon, topWishes, todayPaymentsItems, todayPaymentsTotal, sortTopics, subjectProgress, ungroupedTopics, groupTopics, filteredTopicsForSubject, isModeHidden, isFinanceAdvanced, currentOnHandBalance, financePaymentBalanceDelta, financeOperationBalanceEffect, nearestUnpaidFinancePayment, nearestPlannedFinanceIncome } from './selectors';
+import { calculateDailyBudget, dailyBudgetColor, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, latestWateringStage, plantTimelineStats, dayCountLabel, formatDateDmy, parseDateDmy, environmentChart, latestEnvironmentReading, wateringPhotoEntries, wateringPhotoGroups, plantPhotoCount, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, todayTasks, taskDueSoon, topWishes, todayPaymentsItems, todayPaymentsTotal, sortTopics, subjectProgress, ungroupedTopics, groupTopics, filteredTopicsForSubject, isModeHidden, isFinanceAdvanced, currentOnHandBalance, financePaymentBalanceDelta, financeOperationBalanceEffect, nearestUnpaidFinancePayment, nearestPlannedFinanceIncome } from './selectors';
 import { createEmptyState } from './types';
 
 describe('calculateDailyBudget', () => {
@@ -544,6 +544,27 @@ describe('environmentChart', () => {
     ];
 
     expect(environmentChart(state, 'all').points[0]).toMatchObject({ temperature: 26, humidity: 54 });
+  });
+});
+
+describe('watering photo selectors', () => {
+  it('lists and groups only photo entries for the selected plant by descending date', () => {
+    const state = createEmptyState();
+    const fert = { micro: null, grow: null, bloom: null, ripen: null };
+    state.waterings = [
+      { id: 'older', plantId: 'p1', date: '2026-10-01', water: null, ph: null, fert, note: '', photoIds: ['a'], createdAt: 1 },
+      { id: 'newer', plantId: 'p1', date: '2026-10-05', water: null, ph: null, fert, note: '', photoIds: ['b', 'c'], createdAt: 2 },
+      { id: 'same-day', plantId: 'p1', date: '2026-10-05', water: null, ph: null, fert, note: '', photoIds: ['d'], createdAt: 3 },
+      { id: 'empty', plantId: 'p1', date: '2026-10-06', water: null, ph: null, fert, note: '', createdAt: 4 },
+      { id: 'other-plant', plantId: 'p2', date: '2026-10-07', water: null, ph: null, fert, note: '', photoIds: ['e'], createdAt: 5 },
+    ];
+
+    expect(wateringPhotoEntries(state, 'p1').map((entry) => entry.id)).toEqual(['same-day', 'newer', 'older']);
+    expect(wateringPhotoGroups(state, 'p1').map((group) => [group.date, group.entries.length])).toEqual([
+      ['2026-10-05', 2],
+      ['2026-10-01', 1],
+    ]);
+    expect(plantPhotoCount(state, 'p1')).toBe(4);
   });
 });
 

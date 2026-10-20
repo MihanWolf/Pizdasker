@@ -103,6 +103,8 @@ app/ ui/   — клей: навигация, диалоги, общие комп
 | `src/core/selectors.test.ts` | Тесты селекторов (Vitest) |
 | `src/core/backup.ts` | `exportBackup()` / `importBackup()` |
 | `src/core/backup.test.ts` | Тесты совместимости бэкапов |
+| `src/core/plantPhotoStorage.ts` | Локальное IndexedDB-хранилище фотографий растений |
+| `src/core/backupArchive.ts` | ZIP-бэкапы состояния вместе с прикреплёнными фото |
 | `src/app/Shelf.tsx` | Единая полка: иконки режимов + корешки активного раздела + «+» |
 | `src/app/modes.tsx` | `NAV_MODES`: единый список разделов для полки и настроек |
 | `src/app/TopBar.tsx` | Общая шапка раздела: цветная точка, inline-имя, мета, удаление |
@@ -180,7 +182,7 @@ interface FertAmounts { micro: number|null; grow: number|null; bloom: number|nul
 interface Watering {
   id: string; plantId: string; date: string;
   water: number|null; ph: number|null; ppm?: number|null;
-  fert: FertAmounts; note: string; stage?: PlantStage; createdAt: number;
+  fert: FertAmounts; note: string; stage?: PlantStage; photoIds?: string[]; createdAt: number;
 }
 interface EnvironmentReading {
   id: string; recordedAt: string; temperature: number; humidity: number; createdAt: number;
@@ -233,7 +235,7 @@ interface AppState {
   environmentReadings: EnvironmentReading[]; // общий журнал температуры/влажности с точным временем
   activePlantId: string | null;
   plantsSearch: string;                   // поле поиска раздела «Полив»
-  plantsView: 'watering' | 'climate';     // активная вкладка раздела
+  plantsView: 'watering' | 'climate' | 'gallery'; // активная вкладка раздела
 
   shoppingItems: ShoppingItem[];
   shoppingView: 'current' | 'archive';
@@ -518,6 +520,12 @@ interface Store {
   журнал всех измерений, где можно отредактировать дату/время и значения или
   удалить запись. Данные хранятся в `environmentReadings`, независимо от
   выбранного растения.
+- Записи полива могут содержать несколько фотографий. Файлы живут в IndexedDB,
+  а в записи сохраняются только их id. Вкладка «Галерея» выбранного растения
+  группирует фотографии по дате полива; снимки можно открыть крупно и удалить.
+  Фото можно выбрать из галереи устройства или снять камерой телефона.
+- Экспорт создаёт ZIP с JSON-данными и всеми прикреплёнными фотографиями;
+  импорт принимает такой ZIP и прежние JSON-бэкапы.
 - Быстрое добавление полива: дата, вода (л), pH, PPM, удобрения TriPart
   (Grow/Micro/Bloom/Ripen), стадия роста (Росток / Вегетация / Предцвет /
   Цветение), заметка. Новая запись наследует последнюю указанную стадию
@@ -568,7 +576,7 @@ interface Store {
 
 ---
 
-## 9. Резервное копирование — `backup.ts`
+## 9. Резервное копирование — `backup.ts` / `backupArchive.ts`
 
 - **Формат** — тот же снимок, что делал `snapshotState()` в старом `app.js`,
   плюс поле `exportedAt: ISO string`. Старые бэкапы читаются без миграции.
@@ -581,17 +589,29 @@ interface Store {
   - иначе — `{ active: false, scene: 'done' }` (импорт = данные уже есть);
   - если `onboarding` отсутствует **и** пользовательских данных нет —
     `{ active: true, scene: 'birth' }`.
+- Фото полива хранятся в IndexedDB `pizdasker-media`, отдельно от JSON
+  состояния; `Watering.photoIds` содержит ссылки на фото. При удалении записи,
+  растения или сбросе данных связанные файлы также очищаются.
+- `exportBackupArchive(state)` собирает ZIP: `konspekt-backup.json` плюс файлы
+  `photos/<id>.<extension>`. Экспорт останавливается с ошибкой, если файл из
+  записи не найден.
+- `parseBackupArchive(bytes)` валидирует JSON-манифест, проверяет наличие всех
+  упомянутых фото и подготавливает их к восстановлению.
 - `BackupBar.tsx` (`FooterBar`) — fixed-панель внизу:
   - слева индикатор сохранения (`saveStatus`) + «повторить» при ошибке;
-  - **экспорт** → Blob + `<a download="konspekt-backup-YYYY-MM-DD.json">`;
-  - **импорт** → FileReader + `useConfirm` о необратимости + `importState`;
-  - **очистить все данные** → `useConfirm` + `importState(createEmptyState())`.
+  - **экспорт** → ZIP + `<a download="konspekt-backup-YYYY-MM-DD.zip">`;
+  - **импорт** → ZIP (данные и фотографии) или прежний JSON (без фотографий),
+    `useConfirm` о необратимости + `importState`;
+  - **очистить все данные** → `useConfirm`, удаление фотографий и
+    `importState(createEmptyState())`.
 
 ### 9.1. Тесты (`backup.test.ts`)
 
 - Импорт реального сэмпла старого vanilla-экспорта.
 - Заполнение отсутствующих полей дефолтами (не бросает).
 - Round-trip `export(new) → import(new)` сохраняет данные.
+- ZIP-манифест восстанавливает фото по id и отклоняет архив без приложенных
+  файлов фотографий.
 
 ---
 

@@ -109,6 +109,7 @@ export interface Watering {
   fert: FertAmounts;
   note: string;
   stage?: PlantStage;
+  photoIds?: string[];
   createdAt: number;
 }
 
@@ -213,7 +214,7 @@ export interface AppState {
   environmentReadings: EnvironmentReading[];
   activePlantId: string | null;
   plantsSearch: string;
-  plantsView: 'watering' | 'climate';
+  plantsView: 'watering' | 'climate' | 'gallery';
 
   shoppingItems: ShoppingItem[];
   shoppingView: 'current' | 'archive';
