@@ -12,9 +12,11 @@ interface TopBarProps {
   deleteMessage: string;
   onDelete: () => void;
   meta: React.ReactNode;
+  headerContent?: React.ReactNode;
+  className?: string;
 }
 
-export function TopBar({ name, color, onRename, onCycleColor, deleteLabel, deleteTitle, deleteMessage, onDelete, meta }: TopBarProps) {
+export function TopBar({ name, color, onRename, onCycleColor, deleteLabel, deleteTitle, deleteMessage, onDelete, meta, headerContent, className }: TopBarProps) {
   const confirm = useConfirm();
 
   const handleDelete = async () => {
@@ -23,7 +25,7 @@ export function TopBar({ name, color, onRename, onCycleColor, deleteLabel, delet
   };
 
   return (
-    <div className="topbar">
+    <div className={`topbar ${className ?? ''}`}>
       <div className="subject-title-wrap">
         <div className="subject-dot" style={{ background: COLOR_VARS[color] }} onClick={onCycleColor} title="Сменить цвет" />
         <div
@@ -37,6 +39,7 @@ export function TopBar({ name, color, onRename, onCycleColor, deleteLabel, delet
           {name}
         </div>
       </div>
+      {headerContent}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <div className="subject-progress">{meta}</div>
         <button className="delete-subject" onClick={handleDelete}>{deleteLabel}</button>

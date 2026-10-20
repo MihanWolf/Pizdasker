@@ -15,6 +15,7 @@ function hasAnyUserData(s: AppState): boolean {
     s.financeItems.length ||
     s.financeOperations.length ||
     s.plants.length ||
+    s.environmentReadings.length ||
     s.shoppingItems.length ||
     s.taskProjects.length ||
     s.taskItems.length
@@ -54,8 +55,10 @@ export function importBackup(raw: string): ImportResult {
     balance: typeof parsed.balance === 'number' ? parsed.balance : empty.balance,
     plants: parsed.plants ?? empty.plants,
     waterings: parsed.waterings ?? empty.waterings,
+    environmentReadings: Array.isArray(parsed.environmentReadings) ? parsed.environmentReadings : empty.environmentReadings,
     activePlantId: parsed.activePlantId ?? empty.activePlantId,
     plantsSearch: parsed.plantsSearch ?? '',
+    plantsView: parsed.plantsView === 'climate' ? 'climate' : 'watering',
     shoppingItems: Array.isArray(parsed.shoppingItems) ? parsed.shoppingItems : empty.shoppingItems,
     shoppingView: parsed.shoppingView === 'archive' ? 'archive' : 'current',
     taskProjects: Array.isArray(parsed.taskProjects) ? parsed.taskProjects : empty.taskProjects,

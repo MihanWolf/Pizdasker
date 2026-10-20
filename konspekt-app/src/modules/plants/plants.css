@@ -2,7 +2,103 @@
   font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-soft);
   display: flex; align-items: center; gap: 6px;
 }
+.plant-meta { display: flex; flex-direction: column; align-items: stretch; gap: 5px; }
+.plant-meta > * { box-sizing: border-box; min-height: 23px; padding: 4px 8px; border-left: 2px solid var(--teal); border-radius: 3px; background: rgba(47,119,117,0.07); }
+.plant-timeline-stat { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-soft); white-space: nowrap; }
+.plant-meta .plant-timeline-stat + .plant-timeline-stat { border-left-color: var(--mustard); background: rgba(170,121,5,0.08); }
+.plant-meta .plant-last-watered { border-left-color: var(--slate); background: rgba(67,93,135,0.07); }
 .plant-last-watered svg { width: 13px; height: 13px; color: var(--slate); }
+
+.plants-subtabs { display: flex; gap: 4px; margin-bottom: 10px; border-bottom: 1px solid var(--rule); }
+.plants-subtabs button {
+  padding: 7px 12px; border: 0; border-bottom: 2px solid transparent; background: transparent;
+  color: var(--ink-faint); font: 11px 'JetBrains Mono', monospace; cursor: pointer;
+}
+.plants-subtabs button.active { border-bottom-color: var(--teal); color: var(--ink); }
+.plants-subtabs button span { margin-left: 4px; opacity: .65; }
+
+.plant-topbar { align-items: center; }
+.plant-topbar .subject-title-wrap { flex-shrink: 0; }
+.environment-chart {
+  flex: 1 1 300px; min-width: 220px; max-width: 760px; padding: 5px 10px;
+  border: 1px solid var(--rule); border-radius: 8px; background: rgba(255,255,255,0.32);
+}
+.environment-chart-head, .environment-chart-legend, .environment-chart-dates {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.environment-chart-legend { justify-content: flex-start; font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+.environment-legend-temp, .environment-axis-temp { color: #d96b24; }
+.environment-legend-humidity, .environment-axis-humidity { color: #3277c7; }
+.environment-chart-head select {
+  border: none; background: transparent; color: var(--ink-soft); font-family: 'JetBrains Mono', monospace; font-size: 10px;
+}
+.environment-chart-svg { display: block; width: 100%; height: 56px; overflow: visible; }
+.environment-chart-svg line { stroke: var(--rule); stroke-width: 1; stroke-dasharray: 2 4; }
+.environment-chart-svg line.environment-chart-day-tick { stroke-dasharray: 1 4; opacity: .65; }
+.environment-chart-svg text { fill: var(--ink-soft); font: 700 13px 'JetBrains Mono', monospace; }
+.environment-chart-svg text.environment-axis-temp { fill: #c65410; }
+.environment-chart-svg text.environment-axis-humidity { fill: #1d5fae; }
+.environment-temperature-area { fill: url(#environment-temperature-fill); }
+.environment-humidity-area { fill: url(#environment-humidity-fill); }
+.environment-temperature-line, .environment-humidity-line {
+  fill: none; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 1; stroke-dashoffset: 1; animation: environment-line-draw .75s cubic-bezier(.2,.7,.25,1) forwards;
+}
+@keyframes environment-line-draw { to { stroke-dashoffset: 0; } }
+.environment-temperature-line { stroke: #e87524; }
+.environment-humidity-line { stroke: #3277c7; }
+.environment-temperature-point, .environment-humidity-point {
+  stroke: var(--card); stroke-width: 1.5; transform-box: fill-box; transform-origin: center;
+  animation: environment-point-appear .35s cubic-bezier(.2,.8,.3,1) both;
+}
+.environment-temperature-point { fill: #e87524; }
+.environment-humidity-point { fill: #3277c7; }
+@keyframes environment-point-appear { from { opacity: 0; scale: .6; } to { opacity: 1; scale: 1; } }
+.environment-chart-svg circle { transition: r .15s ease, filter .15s ease; }
+.environment-chart-svg circle:hover { r: 4.5px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.25)); }
+.environment-chart-dates { color: var(--ink-faint); font: 8px 'JetBrains Mono', monospace; }
+.environment-chart-dates span { flex: 1; text-align: center; }
+.environment-chart-empty { height: 56px; display: grid; place-items: center; color: var(--ink-faint); font-size: 11px; }
+@media (prefers-reduced-motion: reduce) {
+  .environment-temperature-line, .environment-humidity-line, .environment-temperature-point, .environment-humidity-point {
+    animation: none; stroke-dashoffset: 0; opacity: 1;
+  }
+}
+
+.environment-quick-add {
+  display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; padding: 12px 16px;
+  margin-bottom: 10px; border: 1px solid var(--rule); border-radius: 8px; background: rgba(255,255,255,0.35);
+}
+.environment-entry-title { align-self: center; margin-right: 2px; font-family: 'Fraunces', serif; font-size: 16px; font-weight: 600; font-style: italic; color: var(--ink-soft); }
+.environment-quick-add label { display: flex; flex-direction: column; gap: 4px; }
+.environment-quick-add label span { font: 10px 'JetBrains Mono', monospace; color: var(--ink-faint); }
+.environment-quick-add input {
+  min-height: 30px; width: 120px; border: 0; border-bottom: 1px dashed var(--rule); outline: none;
+  background: transparent; color: var(--ink); font: 12px 'JetBrains Mono', monospace;
+}
+.environment-quick-add input:focus { border-bottom-color: var(--ink-soft); }
+.environment-quick-add button {
+  min-height: 30px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--ink); color: #fff;
+  font-size: 12px; cursor: pointer;
+}
+.environment-quick-add button:disabled { opacity: .5; cursor: not-allowed; }
+
+.climate-topbar { align-items: center; }
+.climate-topbar .environment-chart { flex: 1; max-width: none; }
+.environment-journal { display: flex; flex-direction: column; gap: 8px; }
+.environment-reading {
+  display: flex; align-items: center; gap: 18px; padding: 10px 14px; border-radius: 8px;
+  background: var(--card); box-shadow: 0 1px 2px var(--shadow), 0 4px 10px -6px var(--shadow);
+  border-left: 3px solid #3277c7;
+}
+.environment-reading-time { width: 185px; border: 0; background: transparent; color: var(--ink-soft); font: 11px 'JetBrains Mono', monospace; }
+.environment-reading-value { display: flex; align-items: center; gap: 5px; font: 12px 'JetBrains Mono', monospace; }
+.environment-reading-value span { color: var(--ink-faint); font-size: 10px; }
+.environment-reading-value input { width: 55px; border: 0; border-bottom: 1px dashed var(--rule); background: transparent; color: inherit; text-align: right; font: inherit; }
+.environment-reading-temp { color: #d96b24; }
+.environment-reading-humidity { color: #3277c7; }
+.environment-reading-delete { margin-left: auto; border: 0; background: transparent; color: var(--ink-faint); font-size: 18px; cursor: pointer; }
+.environment-reading-delete:hover { color: var(--urgent); }
 
 .plant-quick-add {
   display: flex; align-items: center; gap: 10px; padding: 12px 16px; border: 1.5px dashed var(--rule);
@@ -12,6 +108,22 @@
   border: none; border-bottom: 1px dashed var(--rule); background: transparent; outline: none;
   font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--ink-soft); width: 120px;
 }
+.plant-quick-add input[aria-label="Дата полива, день/месяц/год"] { width: 110px; }
+.watering-stage-field { display: flex; align-items: center; gap: 5px; }
+.watering-stage-field > span { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-faint); }
+.watering-stage-field select, .watering-stage {
+  max-width: 150px; border: none; border-bottom: 1px dashed var(--rule); background: transparent; outline: none;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-soft); padding: 3px 0;
+}
+.watering-stage-field select, .watering-stage {
+  border: none; border-radius: 10px; padding: 4px 9px; transition: background-color .15s, color .15s;
+}
+.watering-stage-field select[data-stage="Росток"], .watering-stage[data-stage="Росток"] { background: rgba(47,119,117,0.13); color: var(--teal); }
+.watering-stage-field select[data-stage="Вегетация"], .watering-stage[data-stage="Вегетация"] { background: rgba(63,120,74,0.15); color: var(--forest); }
+.watering-stage-field select[data-stage="Предцвет"], .watering-stage[data-stage="Предцвет"] { background: rgba(170,121,5,0.16); color: var(--mustard); }
+.watering-stage-field select[data-stage="Цветение"], .watering-stage[data-stage="Цветение"] { background: rgba(217,101,34,0.2); color: #c14f16; }
+.watering-stage { border-bottom-color: transparent; }
+.watering-stage:focus { border-bottom-color: var(--ink-faint); }
 .plant-quick-add input[type="number"] {
   width: 60px; border: none; border-bottom: 1px dashed var(--rule); background: transparent; outline: none;
   font-size: 13.5px; font-family: 'JetBrains Mono', monospace; color: var(--ink);
@@ -29,6 +141,7 @@
   border: none; background: var(--ink); color: #fff; border-radius: 6px; padding: 7px 16px;
   font-size: 12.5px; cursor: pointer; flex-shrink: 0;
 }
+.plant-quick-add button:disabled { opacity: .5; cursor: not-allowed; }
 
 .waterings-list { display: flex; flex-direction: column; gap: 10px; }
 .watering-row {
@@ -41,7 +154,7 @@
 .watering-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .watering-date {
   font-family: 'JetBrains Mono', monospace; font-size: 12.5px; font-weight: 600; color: var(--ink);
-  outline: none; border: none; background: transparent;
+  outline: none; border: none; background: transparent; width: 92px;
 }
 .watering-date:focus { border-bottom: 1px dashed var(--ink-faint); }
 .watering-pill {
@@ -83,3 +196,14 @@
 }
 .watering-row:hover .watering-del { opacity: 1; }
 .watering-del:hover { color: var(--urgent); }
+
+@media (max-width: 720px) {
+  .plant-topbar { align-items: stretch; }
+  .environment-chart { flex-basis: 100%; order: 3; }
+  .environment-quick-add { align-items: stretch; }
+  .environment-entry-title { align-self: center; }
+  .environment-reading { flex-wrap: wrap; gap: 10px; }
+  .environment-reading-time { flex-basis: calc(100% - 34px); }
+  .climate-topbar { align-items: stretch; }
+  .climate-topbar .environment-chart { flex-basis: 100%; }
+}

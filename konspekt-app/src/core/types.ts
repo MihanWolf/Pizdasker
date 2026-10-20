@@ -88,6 +88,10 @@ export interface Plant {
   createdAt: number;
 }
 
+export type PlantStage = 'Росток' | 'Вегетация' | 'Предцвет' | 'Цветение';
+
+export const PLANT_STAGES: PlantStage[] = ['Росток', 'Вегетация', 'Предцвет', 'Цветение'];
+
 export interface FertAmounts {
   micro: number | null;
   grow: number | null;
@@ -104,6 +108,15 @@ export interface Watering {
   ppm?: number | null;
   fert: FertAmounts;
   note: string;
+  stage?: PlantStage;
+  createdAt: number;
+}
+
+export interface EnvironmentReading {
+  id: string;
+  recordedAt: string;
+  temperature: number;
+  humidity: number;
   createdAt: number;
 }
 
@@ -197,8 +210,10 @@ export interface AppState {
 
   plants: Plant[];
   waterings: Watering[];
+  environmentReadings: EnvironmentReading[];
   activePlantId: string | null;
   plantsSearch: string;
+  plantsView: 'watering' | 'climate';
 
   shoppingItems: ShoppingItem[];
   shoppingView: 'current' | 'archive';
@@ -242,8 +257,10 @@ export function createEmptyState(): AppState {
     balance: 0,
     plants: [],
     waterings: [],
+    environmentReadings: [],
     activePlantId: null,
     plantsSearch: '',
+    plantsView: 'watering',
     shoppingItems: [],
     shoppingView: 'current',
     taskProjects: [],

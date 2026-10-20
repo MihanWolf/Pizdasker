@@ -46,6 +46,7 @@ function hasAnyUserData(s: AppState): boolean {
     s.notePages.length ||
     s.financeItems.length ||
     s.plants.length ||
+    s.environmentReadings.length ||
     s.shoppingItems.length ||
     s.taskProjects.length ||
     s.taskItems.length

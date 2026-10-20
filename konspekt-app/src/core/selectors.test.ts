@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateDailyBudget, dailyBudgetColor, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, todayTasks, taskDueSoon, topWishes, todayPaymentsItems, todayPaymentsTotal, sortTopics, subjectProgress, ungroupedTopics, groupTopics, filteredTopicsForSubject, isModeHidden, isFinanceAdvanced, currentOnHandBalance, financePaymentBalanceDelta, financeOperationBalanceEffect, nearestUnpaidFinancePayment, nearestPlannedFinanceIncome } from './selectors';
+import { calculateDailyBudget, dailyBudgetColor, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, latestWateringStage, plantTimelineStats, dayCountLabel, formatDateDmy, parseDateDmy, environmentChart, latestEnvironmentReading, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, todayTasks, taskDueSoon, topWishes, todayPaymentsItems, todayPaymentsTotal, sortTopics, subjectProgress, ungroupedTopics, groupTopics, filteredTopicsForSubject, isModeHidden, isFinanceAdvanced, currentOnHandBalance, financePaymentBalanceDelta, financeOperationBalanceEffect, nearestUnpaidFinancePayment, nearestPlannedFinanceIncome } from './selectors';
 import { createEmptyState } from './types';
 
 describe('calculateDailyBudget', () => {
@@ -433,6 +433,120 @@ describe('finance selectors', () => {
     expect(todayPaymentsTotal(state, now)).toBe(2);
   });
 });
+
+describe('latestWateringStage', () => {
+  it('returns the latest recorded stage for the selected plant and skips older entries without a stage', () => {
+    const state = createEmptyState();
+    state.waterings = [
+      { id: 'old', plantId: 'p1', date: '2026-10-01', water: null, ph: null, fert: { micro: null, grow: null, bloom: null, ripen: null }, note: '', stage: 'Росток', createdAt: 1 },
+      { id: 'newer-without-stage', plantId: 'p1', date: '2026-10-03', water: null, ph: null, fert: { micro: null, grow: null, bloom: null, ripen: null }, note: '', createdAt: 2 },
+      { id: 'latest', plantId: 'p1', date: '2026-10-02', water: null, ph: null, fert: { micro: null, grow: null, bloom: null, ripen: null }, note: '', stage: 'Цветение', createdAt: 3 },
+      { id: 'other-plant', plantId: 'p2', date: '2026-10-04', water: null, ph: null, fert: { micro: null, grow: null, bloom: null, ripen: null }, note: '', stage: 'Предцвет', createdAt: 4 },
+    ];
+
+    expect(latestWateringStage(state, 'p1')).toBe('Цветение');
+    expect(latestWateringStage(state, 'p2')).toBe('Предцвет');
+    expect(latestWateringStage(state, 'missing')).toBeNull();
+  });
+});
+
+describe('plantTimelineStats', () => {
+  it('counts the current stage from its first consecutive entry and plant age from the first watering', () => {
+    const state = createEmptyState();
+    const fert = { micro: null, grow: null, bloom: null, ripen: null };
+    state.waterings = [
+      { id: 'first', plantId: 'p1', date: '2026-10-01', water: null, ph: null, fert, note: '', createdAt: 1 },
+      { id: 'sprout', plantId: 'p1', date: '2026-10-03', water: null, ph: null, fert, note: '', stage: 'Росток', createdAt: 2 },
+      { id: 'veg-start', plantId: 'p1', date: '2026-10-10', water: null, ph: null, fert, note: '', stage: 'Вегетация', createdAt: 3 },
+      { id: 'veg-later', plantId: 'p1', date: '2026-10-15', water: null, ph: null, fert, note: '', stage: 'Вегетация', createdAt: 4 },
+    ];
+
+    expect(plantTimelineStats(state, 'p1', new Date('2026-10-20T12:00:00'))).toEqual({
+      stage: 'Вегетация',
+      daysOnStage: 10,
+      ageDays: 19,
+    });
+  });
+
+  it('returns age without a stage and handles plants with no watering records', () => {
+    const state = createEmptyState();
+    state.waterings = [{
+      id: 'legacy', plantId: 'p1', date: '2026-10-19', water: null, ph: null,
+      fert: { micro: null, grow: null, bloom: null, ripen: null }, note: '', createdAt: 1,
+    }];
+
+    expect(plantTimelineStats(state, 'p1', new Date('2026-10-20T12:00:00'))).toEqual({
+      stage: null,
+      daysOnStage: null,
+      ageDays: 1,
+    });
+    expect(plantTimelineStats(state, 'missing', new Date('2026-10-20T12:00:00'))).toEqual({
+      stage: null,
+      daysOnStage: null,
+      ageDays: null,
+    });
+  });
+});
+
+describe('dayCountLabel', () => {
+  it('uses correct Russian day forms', () => {
+    expect(dayCountLabel(1)).toBe('1 день');
+    expect(dayCountLabel(3)).toBe('3 дня');
+    expect(dayCountLabel(12)).toBe('12 дней');
+  });
+});
+
+describe('date format helpers', () => {
+  it('formats dates as dd/mm/yyyy and parses only valid calendar dates', () => {
+    expect(formatDateDmy('2026-10-20')).toBe('20/10/2026');
+    expect(parseDateDmy('20/10/2026')).toBe('2026-10-20');
+    expect(parseDateDmy('31/02/2026')).toBeNull();
+    expect(parseDateDmy('2026-10-20')).toBeNull();
+  });
+});
+
+describe('environmentChart', () => {
+  it('filters by selected time range, orders measurements, and plots each metric on its own scale', () => {
+    const state = createEmptyState();
+    state.environmentReadings = [
+      { id: 'middle', recordedAt: '2026-10-18T12:00:00.000Z', temperature: 22, humidity: 60, createdAt: 2 },
+      { id: 'outside', recordedAt: '2026-10-01T12:00:00.000Z', temperature: 10, humidity: 40, createdAt: 1 },
+      { id: 'latest', recordedAt: '2026-10-20T06:00:00.000Z', temperature: 26, humidity: 70, createdAt: 3 },
+    ];
+
+    const chart = environmentChart(state, '7d', new Date('2026-10-20T12:00:00.000Z'));
+    expect(chart.points.map((point) => point.id)).toEqual(['middle', 'latest']);
+    expect(chart.temperatureMin).toBe(25);
+    expect(chart.temperatureMax).toBe(32);
+    expect(chart.humidityMin).toBe(40);
+    expect(chart.humidityMax).toBe(70);
+    expect(chart.points[0].x).toBeCloseTo((5 / 7) * 600);
+    expect(chart.points[1].x).toBeCloseTo((6.75 / 7) * 600);
+    expect(chart.points[1].temperatureY).toBeCloseTo(60);
+    expect(chart.points[1].humidityY).toBe(12);
+    expect(latestEnvironmentReading(state)?.id).toBe('latest');
+  });
+
+  it('shows a single all-time measurement in the center and returns empty chart for no matching data', () => {
+    const state = createEmptyState();
+    state.environmentReadings = [
+      { id: 'sole', recordedAt: '2026-10-19T10:00:00.000Z', temperature: 20, humidity: 50, createdAt: 1 },
+    ];
+
+    expect(environmentChart(state, 'all').points[0].x).toBe(300);
+    expect(environmentChart(state, '7d', new Date('2026-10-30T10:00:00.000Z')).points).toEqual([]);
+  });
+
+  it('rounds fractional legacy readings to whole numbers in chart data', () => {
+    const state = createEmptyState();
+    state.environmentReadings = [
+      { id: 'fractional', recordedAt: '2026-10-20T10:00:00.000Z', temperature: 25.6, humidity: 54.4, createdAt: 1 },
+    ];
+
+    expect(environmentChart(state, 'all').points[0]).toMatchObject({ temperature: 26, humidity: 54 });
+  });
+});
+
 describe('filteredTasksForProject', () => {
   it('filters by done/current view and sorts important-first, newest-first', () => {
     const state = createEmptyState();

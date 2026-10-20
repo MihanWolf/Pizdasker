@@ -49,12 +49,60 @@ describe('importBackup (legacy compatibility)', () => {
     expect(state.currency).toBe('₽');
   });
 
+  it('keeps older watering entries that do not have a growth stage', () => {
+    const oldWatering = {
+      id: 'old-watering',
+      plantId: 'p1',
+      date: '2026-10-19',
+      water: 1,
+      ph: 6,
+      fert: { micro: null, grow: null, bloom: null, ripen: null },
+      note: '',
+      createdAt: 1,
+    };
+    const { state } = importBackup(JSON.stringify({ waterings: [oldWatering] }));
+
+    expect(state.waterings[0]).toEqual(oldWatering);
+    expect(state.waterings[0].stage).toBeUndefined();
+  });
+
+  it('round-trips timestamped environment readings and defaults them for old backups', () => {
+    const original = createEmptyState();
+    original.environmentReadings = [{
+      id: 'climate-1',
+      recordedAt: '2026-10-20T04:15:00.000Z',
+      temperature: 23.5,
+      humidity: 61,
+      createdAt: 2,
+    }];
+    original.plantsView = 'climate';
+    const { state: restored } = importBackup(exportBackup(original));
+    const { state: legacy } = importBackup('{"plants":[]}');
+
+    expect(restored.environmentReadings).toEqual(original.environmentReadings);
+    expect(restored.plantsView).toBe('climate');
+    expect(legacy.environmentReadings).toEqual([]);
+    expect(legacy.plantsView).toBe('watering');
+  });
+
   it('round-trips: export(new) -> import(new) preserves data', () => {
     const original = createEmptyState();
     original.shoppingItems = [{ id: 'x', title: 'Хлеб', quantity: '', createdAt: 1, purchasedAt: null }];
+    original.waterings = [{
+      id: 'w1',
+      plantId: 'p1',
+      date: '2026-10-20',
+      water: 1,
+      ph: 6,
+      fert: { micro: null, grow: null, bloom: null, ripen: null },
+      note: '',
+      stage: 'Вегетация',
+      createdAt: 2,
+    }];
     const exported = exportBackup(original);
     const { state: reimported } = importBackup(exported);
     expect(reimported.shoppingItems).toEqual(original.shoppingItems);
+    expect(reimported.waterings).toEqual(original.waterings);
   });
 
   it('defaults settings for backups that predate them', () => {

@@ -1,4 +1,4 @@
-import type { AppMode, AppState, FinanceItem, FinanceOperation } from './types';
+import type { AppMode, AppState, EnvironmentReading, FinanceItem, FinanceOperation, PlantStage } from './types';
 
 export function isModeHidden(state: AppState, mode: AppMode): boolean {
   return state.settings.hiddenModes.includes(mode);
@@ -98,6 +98,76 @@ export function latestWateringDate(state: AppState, plantId: string): string | n
   return entry ? entry.date : null;
 }
 
+export function latestWateringStage(state: AppState, plantId: string): PlantStage | null {
+  const entry = state.waterings
+    .filter((w) => w.plantId === plantId && w.stage)
+    .slice()
+    .sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.createdAt - a.createdAt)[0];
+  return entry?.stage ?? null;
+}
+
+export function plantTimelineStats(
+  state: AppState,
+  plantId: string,
+  now = new Date(),
+): { stage: PlantStage | null; daysOnStage: number | null; ageDays: number | null } {
+  const entries = state.waterings
+    .filter((w) => w.plantId === plantId && w.date)
+    .slice()
+    .sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.createdAt - b.createdAt);
+  if (!entries.length) return { stage: null, daysOnStage: null, ageDays: null };
+
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const daysSince = (date: string) => Math.max(
+    0,
+    Math.round((today.getTime() - new Date(date + 'T00:00:00').getTime()) / 86400000),
+  );
+
+  const stagedEntries = entries.filter((entry) => entry.stage);
+  const currentStageEntry = stagedEntries[stagedEntries.length - 1];
+  let stageStart = currentStageEntry;
+  for (let i = stagedEntries.length - 2; i >= 0; i--) {
+    if (stagedEntries[i].stage !== currentStageEntry.stage) break;
+    stageStart = stagedEntries[i];
+  }
+
+  return {
+    stage: currentStageEntry?.stage ?? null,
+    daysOnStage: currentStageEntry ? daysSince(stageStart.date) : null,
+    ageDays: daysSince(entries[0].date),
+  };
+}
+
+export function dayCountLabel(days: number): string {
+  const mod10 = days % 10;
+  const mod100 = days % 100;
+  const unit = mod10 === 1 && mod100 !== 11
+    ? 'день'
+    : [2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)
+      ? 'дня'
+      : 'дней';
+  return `${days} ${unit}`;
+}
+
+export function formatDateDmy(date: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : date;
+}
+
+export function parseDateDmy(value: string): string | null {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
+  if (!match) return null;
+  const [, day, month, year] = match;
+  const parsed = new Date(`${year}-${month}-${day}T00:00:00Z`);
+  if (
+    parsed.getUTCFullYear() !== Number(year) ||
+    parsed.getUTCMonth() + 1 !== Number(month) ||
+    parsed.getUTCDate() !== Number(day)
+  ) return null;
+  return `${year}-${month}-${day}`;
+}
+
 // Порт daysAgoLabel() из plants.js — чистая функция, теперь без похода в DOM.
 export function daysAgoLabel(dateStr: string | null, now = new Date()): string | null {
   if (!dateStr) return null;
@@ -121,6 +191,100 @@ export function filteredWateringsForPlant(state: AppState, plantId: string, quer
     });
   }
   return entries.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.createdAt - a.createdAt);
+}
+
+export type EnvironmentChartRange = '7d' | '30d' | 'all';
+
+export interface EnvironmentChartPoint {
+  id: string;
+  x: number;
+  temperatureY: number;
+  humidityY: number;
+  temperature: number;
+  humidity: number;
+  recordedAt: string;
+}
+
+export interface EnvironmentChart {
+  points: EnvironmentChartPoint[];
+  temperatureMin: number;
+  temperatureMax: number;
+  humidityMin: number;
+  humidityMax: number;
+  startAt: number | null;
+  endAt: number | null;
+  domainStartAt: number | null;
+  domainEndAt: number | null;
+}
+
+export function environmentChart(
+  state: AppState,
+  range: EnvironmentChartRange,
+  now = new Date(),
+): EnvironmentChart {
+  const end = now.getTime();
+  const rangeStart = range === 'all' ? Number.NEGATIVE_INFINITY : end - (range === '7d' ? 7 : 30) * 86400000;
+  const entries = state.environmentReadings
+    .filter((entry) => {
+      const time = new Date(entry.recordedAt).getTime();
+      return Number.isFinite(time) && Number.isFinite(entry.temperature) && Number.isFinite(entry.humidity) &&
+        (range === 'all' || (time >= rangeStart && time <= end));
+    })
+    .slice()
+    .sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime() || a.createdAt - b.createdAt);
+  if (!entries.length) {
+    return { points: [], temperatureMin: 25, temperatureMax: 32, humidityMin: 40, humidityMax: 70, startAt: null, endAt: null, domainStartAt: null, domainEndAt: null };
+  }
+
+  const temperatureMin = 25;
+  const temperatureMax = 32;
+  const humidityMin = 40;
+  const humidityMax = 70;
+  const firstTime = new Date(entries[0].recordedAt).getTime();
+  const lastTime = new Date(entries[entries.length - 1].recordedAt).getTime();
+  const domainStartAt = range === 'all' ? (entries.length === 1 ? firstTime - 43200000 : firstTime) : rangeStart;
+  const domainEndAt = range === 'all' ? (entries.length === 1 ? lastTime + 43200000 : lastTime) : end;
+  const timeSpan = domainEndAt - domainStartAt || 1;
+  const plotHeight = 56;
+  const yFor = (value: number, min: number, max: number) => {
+    const bounded = Math.max(min, Math.min(max, Math.round(value)));
+    return 68 - ((bounded - min) / (max - min)) * plotHeight;
+  };
+
+  return {
+    points: entries.map((entry): EnvironmentChartPoint => {
+      const time = new Date(entry.recordedAt).getTime();
+      return {
+        id: entry.id,
+        x: ((time - domainStartAt) / timeSpan) * 600,
+        temperatureY: yFor(entry.temperature, temperatureMin, temperatureMax),
+        humidityY: yFor(entry.humidity, humidityMin, humidityMax),
+        temperature: Math.round(entry.temperature),
+        humidity: Math.round(entry.humidity),
+        recordedAt: entry.recordedAt,
+      };
+    }),
+    temperatureMin,
+    temperatureMax,
+    humidityMin,
+    humidityMax,
+    startAt: firstTime,
+    endAt: lastTime,
+    domainStartAt,
+    domainEndAt,
+  };
+}
+
+export function latestEnvironmentReading(state: AppState): EnvironmentReading | null {
+  return state.environmentReadings
+    .slice()
+    .sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime() || b.createdAt - a.createdAt)[0] ?? null;
+}
+
+export function sortedEnvironmentReadings(state: AppState): EnvironmentReading[] {
+  return state.environmentReadings
+    .slice()
+    .sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime() || b.createdAt - a.createdAt);
 }
 
 export function taskProjectItems(state: AppState, projectId: string) {

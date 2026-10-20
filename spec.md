@@ -175,11 +175,15 @@ interface FinanceItem {
 }
 
 interface Plant { id: string; name: string; color: ColorName; createdAt: number; }
+type PlantStage = 'Росток' | 'Вегетация' | 'Предцвет' | 'Цветение';
 interface FertAmounts { micro: number|null; grow: number|null; bloom: number|null; ripen: number|null; }
 interface Watering {
   id: string; plantId: string; date: string;
   water: number|null; ph: number|null; ppm?: number|null;
-  fert: FertAmounts; note: string; createdAt: number;
+  fert: FertAmounts; note: string; stage?: PlantStage; createdAt: number;
+}
+interface EnvironmentReading {
+  id: string; recordedAt: string; temperature: number; humidity: number; createdAt: number;
 }
 
 interface ShoppingItem {
@@ -226,8 +230,10 @@ interface AppState {
 
   plants: Plant[];
   waterings: Watering[];
+  environmentReadings: EnvironmentReading[]; // общий журнал температуры/влажности с точным временем
   activePlantId: string | null;
   plantsSearch: string;                   // поле поиска раздела «Полив»
+  plantsView: 'watering' | 'climate';     // активная вкладка раздела
 
   shoppingItems: ShoppingItem[];
   shoppingView: 'current' | 'archive';
@@ -358,7 +364,11 @@ interface Store {
 ### 6.4. Полив
 
 `latestWateringDate`, `filteredWateringsForPlant` (поиск по названиям
-удобрений и заметке, сортировка по дате desc).
+удобрений и заметке, сортировка по дате desc), `latestWateringStage` (последняя
+указанная стадия растения для наследования при создании новой записи),
+`plantTimelineStats` (возраст от первой записи и длительность текущей стадии
+от начала последней последовательности этой стадии), `dayCountLabel`,
+`environmentChart` (фильтрация и нормализация точек общего температурно-влажностного графика), `latestEnvironmentReading`.
 
 ### 6.5. Задачи
 
@@ -496,11 +506,26 @@ interface Store {
 - Полка растений вынесена в общий `Shelf` + активное растение
   (`state.activePlantId`, персистентно).
 - `TopBar`: последний полив (`daysAgoLabel` с иконкой-каплей), удаление
-  растения (каскадно удаляет `waterings`).
+  растения (каскадно удаляет `waterings`); в метаданных также показаны
+  длительность текущей стадии и возраст от первой записи полива.
+- Справа от имени растения в шапке — общий график температуры и влажности
+  с фиксированными вертикальными шкалами 25–32 °C и 40–70%, и периодами
+  7 дней / 30 дней / всё время. Горизонтальная шкала показывает дни; линии
+  сглажены, анимация рисования учитывает `prefers-reduced-motion`, при наведении
+  на точку показываются замер и дата/время.
+- В начале блока растения — быстрая общая запись температуры и влажности;
+  дата и время ставятся автоматически. Отдельная вкладка «Климат» содержит
+  журнал всех измерений, где можно отредактировать дату/время и значения или
+  удалить запись. Данные хранятся в `environmentReadings`, независимо от
+  выбранного растения.
 - Быстрое добавление полива: дата, вода (л), pH, PPM, удобрения TriPart
-  (Grow/Micro/Bloom/Ripen), заметка.
-- Строка полива: inline-редактирование даты/воды/pH/PPM, разворачиваемые
-  удобрения, заметка, удаление.
+  (Grow/Micro/Bloom/Ripen), стадия роста (Росток / Вегетация / Предцвет /
+  Цветение), заметка. Новая запись наследует последнюю указанную стадию
+  растения; её можно сменить при добавлении записи.
+- Строка полива: inline-редактирование даты/стадии/воды/pH/PPM,
+  разворачиваемые удобрения, заметка, удаление. У старых записей стадия
+  остаётся пустой, пока её не укажут вручную. Дата отображается и вводится
+  в формате `dd/mm/yyyy`.
 - Поиск по журналу (`state.plantsSearch`).
 
 ### 8.6. Задачи — `Tasks.tsx`
