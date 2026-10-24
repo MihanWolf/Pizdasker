@@ -30,11 +30,12 @@ export function Today() {
   const wishes = topWishes(state);
   const wishesTotal = topWishesTotal(state);
 
-  const showPayments = paymentsTotal > 0 && !isModeHidden(state, 'finance');
+  const showFinance = !isModeHidden(state, 'finance');
+  const showPayments = paymentsTotal > 0 && showFinance;
   const showTasks = tasksTotal > 0 && !isModeHidden(state, 'tasks');
   const showPlants = state.plants.length > 0 && !isModeHidden(state, 'plants');
   const showNotes = notesTotal > 0 && !isModeHidden(state, 'notes');
-  const showWishes = wishesTotal > 0 && !isModeHidden(state, 'finance');
+  const showWishes = wishesTotal > 0 && showFinance;
 
   return (
     <div className="today-wrap content-scroll">
@@ -43,11 +44,13 @@ export function Today() {
           <div className="today-kicker"><SunIcon /> {dateLabel}</div>
           <h1 className="today-title display">Сегодня</h1>
         </div>
-        <div className="today-right-summary">
-          <div className="today-daily-value" style={{ color: budget.color }}>
-            {fmtMoney(Math.round(budget.displayValue))} {state.currency}
+        {showFinance && (
+          <div className="today-right-summary">
+            <div className="today-daily-value" style={{ color: budget.color }}>
+              {fmtMoney(Math.round(budget.displayValue))} {state.currency}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="today-grid">
