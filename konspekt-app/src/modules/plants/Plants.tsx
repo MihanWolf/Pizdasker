@@ -4,7 +4,7 @@ import { uid, COLOR_VARS, PLANT_STAGES, type EnvironmentReading, type Plant, typ
 import { filteredWateringsForPlant, daysAgoLabel, todayStr, latestWateringDate, latestWateringStage, plantTimelineStats, dayCountLabel, formatDateDmy, parseDateDmy, environmentChart, latestEnvironmentReading, sortedEnvironmentReadings, wateringPhotoGroups, plantPhotoCount, type EnvironmentChartRange } from '../../core/selectors';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { TopBar, useCycleColor } from '../../app/TopBar';
-import { DropletIcon } from '../../ui/icons';
+import { CheckStroke, DropletIcon, ThermometerIcon } from '../../ui/icons';
 import { deletePlantPhotos, getPlantPhoto, storePlantPhotos } from '../../core/plantPhotoStorage';
 import './plants.css';
 
@@ -60,9 +60,6 @@ function PlantView({ plant }: { plant: Plant }) {
   const entries = filteredWateringsForPlant(state, plant.id, search);
   const lastDate = latestWateringDate(state, plant.id);
   const timeline = plantTimelineStats(state, plant.id);
-  const [chartRange, setChartRange] = useState<EnvironmentChartRange>('7d');
-  const chart = environmentChart(state, chartRange);
-  const latestReading = latestEnvironmentReading(state);
 
   const deletePlant = async () => {
     const ok = await confirm({
@@ -101,17 +98,19 @@ function PlantView({ plant }: { plant: Plant }) {
         deleteTitle="Удалить растение?"
         deleteMessage={`«${plant.name}» и весь его журнал поливов будут удалены безвозвратно.`}
         onDelete={deletePlant}
-        headerContent={<EnvironmentChartView chart={chart} range={chartRange} onRangeChange={setChartRange} latest={latestReading} />}
         meta={
-          <div className="plant-meta">
-            {lastDate && <div className="plant-last-watered"><DropletIcon />Последний полив: {daysAgoLabel(lastDate)}</div>}
-            {timeline.stage && timeline.daysOnStage != null && (
-              <div className="plant-timeline-stat">Текущая стадия: {timeline.stage.toLowerCase()} · {dayCountLabel(timeline.daysOnStage)}</div>
-            )}
-            {timeline.ageDays != null && (
-              <div className="plant-timeline-stat">Возраст растения: {dayCountLabel(timeline.ageDays)}</div>
-            )}
-            {!lastDate && <span className="mono">поливов пока нет</span>}
+          <div className="plant-header-meta">
+            <div className="plant-meta">
+              {lastDate && <div className="plant-last-watered"><DropletIcon />Последний полив: {daysAgoLabel(lastDate)}</div>}
+              {timeline.stage && timeline.daysOnStage != null && (
+                <div className="plant-timeline-stat">Текущая стадия: {timeline.stage.toLowerCase()} · {dayCountLabel(timeline.daysOnStage)}</div>
+              )}
+              {timeline.ageDays != null && (
+                <div className="plant-timeline-stat">Возраст растения: {dayCountLabel(timeline.ageDays)}</div>
+              )}
+              {!lastDate && <span className="mono">поливов пока нет</span>}
+            </div>
+            {state.plantsView === 'watering' && <EnvironmentQuickAdd />}
           </div>
         }
       />
@@ -135,7 +134,6 @@ function PlantView({ plant }: { plant: Plant }) {
       <div className="content-scroll">
         {state.plantsView === 'gallery' ? <PlantPhotoGallery plantId={plant.id} /> : (
           <>
-            <EnvironmentQuickAdd />
             {!search && <QuickAddWatering plantId={plant.id} />}
             {entries.length === 0 ? (
               <div className="empty-state">
@@ -155,9 +153,10 @@ function PlantView({ plant }: { plant: Plant }) {
 }
 
 function EnvironmentQuickAdd() {
-  const { update } = useStore();
-  const [temperature, setTemperature] = useState('');
-  const [humidity, setHumidity] = useState('');
+  const { state, update } = useStore();
+  const previousReading = latestEnvironmentReading(state);
+  const [temperature, setTemperature] = useState(() => previousReading ? String(Math.round(previousReading.temperature)) : '');
+  const [humidity, setHumidity] = useState(() => previousReading ? String(Math.round(previousReading.humidity)) : '');
 
   const submit = () => {
     const temp = Number(temperature);
@@ -173,22 +172,23 @@ function EnvironmentQuickAdd() {
       createdAt: Date.now(),
     };
     update((draft) => { draft.environmentReadings.push(reading); });
-    setTemperature('');
-    setHumidity('');
+    setTemperature(String(reading.temperature));
+    setHumidity(String(reading.humidity));
   };
 
   return (
     <form className="environment-quick-add" onSubmit={(e) => { e.preventDefault(); submit(); }}>
-      <div className="environment-entry-title">Климат</div>
       <label>
-        <span>Температура, °C</span>
-        <input type="number" step="1" value={temperature} onChange={(e) => setTemperature(e.target.value)} required />
+        <ThermometerIcon />
+        <input type="number" step="1" aria-label="Температура, °C" value={temperature} onChange={(e) => setTemperature(e.target.value)} required />
       </label>
       <label>
-        <span>Влажность, %</span>
-        <input type="number" min="0" max="100" step="1" value={humidity} onChange={(e) => setHumidity(e.target.value)} required />
+        <DropletIcon />
+        <input type="number" min="0" max="100" step="1" aria-label="Влажность, %" value={humidity} onChange={(e) => setHumidity(e.target.value)} required />
       </label>
-      <button type="submit" disabled={temperature === '' || humidity === ''}>Записать</button>
+      <button type="submit" aria-label="Записать замер климата" title="Записать замер" disabled={temperature === '' || humidity === ''}>
+        <CheckStroke />
+      </button>
     </form>
   );
 }
@@ -216,7 +216,6 @@ function ClimateView() {
         </div>
       </div>
       <div className="content-scroll">
-        <EnvironmentQuickAdd />
         {readings.length ? (
           <div className="environment-journal">
             {readings.map((reading) => <EnvironmentReadingRow key={reading.id} reading={reading} />)}
@@ -415,7 +414,6 @@ function toLocalDateTimeInput(date: Date): string {
 
 function QuickAddWatering({ plantId }: { plantId: string }) {
   const { state, update } = useStore();
-  const imagePickerRef = useRef<HTMLInputElement>(null);
   const cameraPickerRef = useRef<HTMLInputElement>(null);
   const [date, setDate] = useState(formatDateDmy(todayStr()));
   const [water, setWater] = useState('');
@@ -508,10 +506,8 @@ function QuickAddWatering({ plantId }: { plantId: string }) {
         ))}
       </div>
       <input type="text" placeholder="Заметка" value={note} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
-      <input ref={imagePickerRef} className="plant-photo-input" type="file" accept="image/*" multiple onChange={addSelectedPhotos} />
       <input ref={cameraPickerRef} className="plant-photo-input" type="file" accept="image/*" capture="environment" onChange={addSelectedPhotos} />
       <div className="plant-photo-actions">
-        <button type="button" className="plant-photo-button" onClick={() => imagePickerRef.current?.click()}>Выбрать фото</button>
         <button type="button" className="plant-photo-button" onClick={() => cameraPickerRef.current?.click()}>Сделать фото</button>
         {photos.length > 0 && <span className="plant-photo-count">Выбрано: {photos.length}</span>}
       </div>

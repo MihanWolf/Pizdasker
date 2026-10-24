@@ -40,7 +40,7 @@ export function TopBar({ name, color, onRename, onCycleColor, deleteLabel, delet
         </div>
       </div>
       {headerContent}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+      <div className="topbar-meta">
         <div className="subject-progress">{meta}</div>
         <button className="delete-subject" onClick={handleDelete}>{deleteLabel}</button>
       </div>

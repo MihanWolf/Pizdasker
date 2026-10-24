@@ -103,6 +103,7 @@ body {
 }
 .subject-title:hover, .subject-title:focus { border-bottom: 1px dashed var(--ink-faint); }
 .subject-progress { color: var(--ink-soft); font-size: 12.5px; display: flex; align-items: center; gap: 10px; }
+.topbar-meta { display: flex; align-items: center; gap: 16px; }
 .progress-track { display: flex; gap: 2px; }
 .tick { width: 5px; height: 12px; background: var(--rule); border-radius: 1px; }
 .tick.filled { background: var(--forest); }
