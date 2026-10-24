@@ -238,7 +238,6 @@ body {
   padding: 8px 16px; font-size: 11px; font-family: 'JetBrains Mono', monospace; pointer-events: none;
   z-index: 40;
 }
-.save-indicator { display: flex; align-items: center; gap: 6px; color: var(--ink-faint); pointer-events: auto; }
 .save-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-faint); transition: background .2s; }
 .save-dot.saving { background: var(--amber); }
 .save-dot.saved { background: var(--forest); }
@@ -247,19 +246,27 @@ body {
   background: none; border: none; color: var(--urgent); text-decoration: underline; cursor: pointer; font-size: 11px;
   pointer-events: auto; font-family: 'JetBrains Mono', monospace;
 }
-.footer-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px 12px; max-width: min(760px, 72vw); pointer-events: auto; }
-.footer-btn {
-  font-size: 10px; color: var(--ink-faint); background: none; border: none; cursor: pointer;
-  opacity: .6; pointer-events: auto; font-family: 'JetBrains Mono', monospace;
+.footer-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; max-width: min(760px, 72vw); margin-left: auto; pointer-events: auto; }
+.footer-icon-btn {
+  display: flex; align-items: center; justify-content: center; width: 40px; height: 40px;
+  border: 1px solid var(--rule); border-radius: 10px; background: var(--card); color: var(--ink-soft);
+  cursor: pointer; pointer-events: auto; box-shadow: 0 2px 8px var(--shadow); transition: color .15s, background .15s;
 }
-.footer-btn:hover { opacity: 1; color: var(--forest); }
-.footer-reset { font-size: 10px; color: var(--ink-faint); background: none; border: none; cursor: pointer; opacity: .5; pointer-events: auto; }
-.footer-reset:hover { opacity: 1; color: var(--urgent); }
+.footer-icon-btn svg { width: 19px; height: 19px; }
+.footer-icon-btn:hover { color: var(--ink); background: #fff; }
+.footer-settings {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; border: 1px solid var(--rule); border-radius: 12px;
+  background: var(--card); color: var(--ink-soft); cursor: pointer; pointer-events: auto;
+  box-shadow: 0 2px 8px var(--shadow); transition: color .15s, background .15s;
+}
+.footer-settings svg { width: 22px; height: 22px; }
+.footer-settings:hover, .footer-settings.active { color: var(--ink); background: #fff; }
+.footer-settings .save-dot { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; outline: 1px solid var(--card); }
 
 @media (max-width: 720px) {
-  .footer-bar { align-items: flex-end; flex-direction: column; gap: 5px; padding: 7px 10px; }
+  .footer-bar { align-items: flex-end; flex-direction: column; gap: 5px; padding: 7px 10px max(7px, env(safe-area-inset-bottom)); }
   .footer-actions { width: 100%; max-width: none; gap: 6px 10px; }
-  .footer-reset, .footer-btn { font-size: 9px; }
   .app-shell { flex-direction: column; }
   .shelf {
     width: 100%; height: auto; flex-direction: row; padding: 10px 12px; overflow-x: auto; overflow-y: hidden;
@@ -273,6 +280,5 @@ body {
   .add-subject-btn { width: 40px; height: 36px; }
   .topbar, .searchbar, .content-scroll { padding-left: 18px; padding-right: 18px; }
   .mode-switch { flex-direction: row; margin-bottom: 0; margin-right: 4px; }
-  .settings-btn { margin-top: 0; margin-left: auto; }
   .shelf-divider { width: 1px; height: 32px; margin-bottom: 0; margin-right: 6px; }
 }

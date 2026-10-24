@@ -3,6 +3,7 @@ import { HIDEABLE_MODES, type AppMode } from '../../core/types';
 import { isModeHidden } from '../../core/selectors';
 import { NAV_MODES } from '../../app/modes';
 import { GearIcon } from '../../ui/icons';
+import { BackupSettings } from './BackupSettings';
 import './settings.css';
 
 export function Settings() {
@@ -74,6 +75,8 @@ export function Settings() {
           </button>
         </div>
       </section>
+
+      <BackupSettings />
     </div>
   );
 }

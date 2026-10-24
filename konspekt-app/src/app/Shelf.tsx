@@ -2,7 +2,6 @@ import { useStore } from '../core/store';
 import { uid, COLOR_VARS, PALETTE } from '../core/types';
 import { subjectProgress, isModeHidden } from '../core/selectors';
 import { useNamePrompt } from '../ui/ConfirmDialog';
-import { GearIcon } from '../ui/icons';
 import { NAV_MODES } from './modes';
 
 export function Shelf() {
@@ -109,15 +108,6 @@ export function Shelf() {
           <button className="add-subject-btn" title="Добавить растение" onClick={addPlant}>+</button>
         </>
       )}
-
-      <button
-        className={'mode-btn settings-btn' + (state.mode === 'settings' ? ' active' : '')}
-        title="Настройки"
-        aria-label="Настройки"
-        onClick={() => update((draft) => { draft.mode = 'settings'; })}
-      >
-        <GearIcon />
-      </button>
     </aside>
   );
 }
