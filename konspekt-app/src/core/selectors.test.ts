@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateDailyBudget, dailyBudgetColor, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, latestWateringStage, plantTimelineStats, dayCountLabel, formatDateDmy, parseDateDmy, environmentChart, latestEnvironmentReading, wateringPhotoEntries, wateringPhotoGroups, plantPhotoCount, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, todayTasks, taskDueSoon, topWishes, todayPaymentsItems, todayPaymentsTotal, sortTopics, subjectProgress, ungroupedTopics, groupTopics, filteredTopicsForSubject, isModeHidden, isFinanceAdvanced, currentOnHandBalance, financePaymentBalanceDelta, financeOperationAmount, financeOperationBalanceEffect, financeOperationEffectiveDate, nearestUnpaidFinancePayment, nearestPlannedFinanceIncome, financeMonthlyTotals, financeWeeklyFlow, financeUpcomingEvents, financeRecentOperations, financeGoalProgress, financePlanSummary } from './selectors';
+import { calculateDailyBudget, dailyBudgetColor, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, latestWateringStage, plantTimelineStats, dayCountLabel, formatDateDmy, parseDateDmy, environmentChart, latestEnvironmentReading, wateringPhotoEntries, wateringPhotoGroups, plantPhotoCount, latestPlantPhotoId, activePlants, archivedPlants, setPlantArchived, plantsNeedingWater, plantsNeedingWaterTotal, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, todayTasks, taskDueSoon, topWishes, todayPaymentsItems, todayPaymentsTotal, sortTopics, subjectProgress, ungroupedTopics, groupTopics, filteredTopicsForSubject, isModeHidden, isFinanceAdvanced, currentOnHandBalance, financePaymentBalanceDelta, financeOperationAmount, financeOperationBalanceEffect, financeOperationEffectiveDate, nearestUnpaidFinancePayment, nearestPlannedFinanceIncome, financeMonthlyTotals, financeWeeklyFlow, financeUpcomingEvents, financeRecentOperations, financeGoalProgress, financePlanSummary } from './selectors';
 import { createEmptyState } from './types';
 
 describe('calculateDailyBudget', () => {
@@ -657,11 +657,52 @@ describe('watering photo selectors', () => {
     ];
 
     expect(wateringPhotoEntries(state, 'p1').map((entry) => entry.id)).toEqual(['same-day', 'newer', 'older']);
+    expect(latestPlantPhotoId(state, 'p1')).toBe('d');
     expect(wateringPhotoGroups(state, 'p1').map((group) => [group.date, group.entries.length])).toEqual([
       ['2026-10-05', 2],
       ['2026-10-01', 1],
     ]);
     expect(plantPhotoCount(state, 'p1')).toBe(4);
+  });
+});
+
+describe('plant archive selectors', () => {
+  it('separates active and archived plants and sorts archive by selected order', () => {
+    const state = createEmptyState();
+    state.plants = [
+      { id: 'p1', name: 'Фикус', color: 'forest', createdAt: 1, archivedAt: 100 },
+      { id: 'p2', name: 'Алоэ', color: 'teal', createdAt: 2, archivedAt: 200 },
+      { id: 'p3', name: 'Монстера', color: 'plum', createdAt: 3 },
+    ];
+    state.waterings = [
+      { id: 'old', plantId: 'p1', date: '2026-10-01', water: null, ph: null, fert: { micro: null, grow: null, bloom: null, ripen: null }, note: '', createdAt: 1 },
+      { id: 'young', plantId: 'p2', date: '2026-10-10', water: null, ph: null, fert: { micro: null, grow: null, bloom: null, ripen: null }, note: '', createdAt: 2 },
+    ];
+
+    expect(activePlants(state).map((plant) => plant.id)).toEqual(['p3']);
+    expect(archivedPlants(state).map((plant) => plant.id)).toEqual(['p2', 'p1']);
+    expect(plantsNeedingWater(state).map((plant) => plant.id)).toEqual(['p3']);
+    expect(plantsNeedingWaterTotal(state)).toBe(1);
+    state.plantsArchiveSort = 'name';
+    expect(archivedPlants(state).map((plant) => plant.id)).toEqual(['p2', 'p1']);
+    state.plantsArchiveSort = 'age';
+    expect(archivedPlants(state, new Date('2026-10-20T12:00:00')).map((plant) => plant.id)).toEqual(['p1', 'p2']);
+  });
+
+  it('archives and restores plants without changing their watering records', () => {
+    const state = createEmptyState();
+    state.plants = [{ id: 'p1', name: 'Монстера', color: 'forest', createdAt: 1 }];
+    state.waterings = [{ id: 'w1', plantId: 'p1', date: '2026-10-01', water: null, ph: null, fert: { micro: null, grow: null, bloom: null, ripen: null }, note: '', createdAt: 2 }];
+
+    const archived = setPlantArchived(state, 'p1', 100);
+    expect(archived.plants[0].archivedAt).toBe(100);
+    expect(archived.plantsView).toBe('archive');
+    expect(archived.waterings).toEqual(state.waterings);
+
+    const restored = setPlantArchived(archived, 'p1', null);
+    expect(restored.plants[0]).not.toHaveProperty('archivedAt');
+    expect(restored.plantsView).toBe('watering');
+    expect(restored.waterings).toEqual(state.waterings);
   });
 });
 

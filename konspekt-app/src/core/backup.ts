@@ -90,6 +90,7 @@ function dashboardData(state: AppState, mode: DashboardMode): Partial<AppState> 
         activePlantId: state.activePlantId,
         plantsSearch: state.plantsSearch,
         plantsView: state.plantsView,
+        plantsArchiveSort: state.plantsArchiveSort,
       };
     case 'study':
       return {
@@ -184,7 +185,8 @@ export function importBackup(raw: string): ImportResult {
     environmentReadings: Array.isArray(parsed.environmentReadings) ? parsed.environmentReadings : empty.environmentReadings,
     activePlantId: parsed.activePlantId ?? empty.activePlantId,
     plantsSearch: parsed.plantsSearch ?? '',
-    plantsView: parsed.plantsView === 'climate' || parsed.plantsView === 'gallery' ? parsed.plantsView : 'watering',
+    plantsView: parsed.plantsView === 'climate' || parsed.plantsView === 'gallery' || parsed.plantsView === 'archive' ? parsed.plantsView : 'watering',
+    plantsArchiveSort: parsed.plantsArchiveSort === 'name' || parsed.plantsArchiveSort === 'age' ? parsed.plantsArchiveSort : 'archived',
     shoppingItems: Array.isArray(parsed.shoppingItems) ? parsed.shoppingItems : empty.shoppingItems,
     shoppingView: parsed.shoppingView === 'archive' ? 'archive' : 'current',
     taskProjects: Array.isArray(parsed.taskProjects) ? parsed.taskProjects : empty.taskProjects,
@@ -236,7 +238,7 @@ export function replaceDashboardData(current: AppState, imported: AppState, mode
     case 'notes':
       return { ...current, notePages: imported.notePages, noteEntries: imported.noteEntries, activeNotePageId: imported.activeNotePageId, notesSearch: imported.notesSearch };
     case 'plants':
-      return { ...current, plants: imported.plants, waterings: imported.waterings, environmentReadings: imported.environmentReadings, activePlantId: imported.activePlantId, plantsSearch: imported.plantsSearch, plantsView: imported.plantsView };
+      return { ...current, plants: imported.plants, waterings: imported.waterings, environmentReadings: imported.environmentReadings, activePlantId: imported.activePlantId, plantsSearch: imported.plantsSearch, plantsView: imported.plantsView, plantsArchiveSort: imported.plantsArchiveSort };
     case 'study':
       return { ...current, subjects: imported.subjects, groups: imported.groups, topics: imported.topics, activeSubjectId: imported.activeSubjectId, studySearch: imported.studySearch };
   }

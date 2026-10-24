@@ -109,6 +109,14 @@ export function ArchiveIcon() {
   );
 }
 
+export function RestoreIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 4h18v4H3zM5 8v12h14V8M9 14a3 3 0 1 0 3-3H9m0 0 2-2m-2 2 2 2" />
+    </svg>
+  );
+}
+
 export function FlagIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor">

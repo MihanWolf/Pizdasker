@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../../core/store';
 import { uid, COLOR_VARS, PLANT_STAGES, type EnvironmentReading, type Plant, type PlantStage, type Watering, type FertAmounts } from '../../core/types';
-import { filteredWateringsForPlant, daysAgoLabel, todayStr, latestWateringDate, latestWateringStage, plantTimelineStats, dayCountLabel, formatDateDmy, parseDateDmy, environmentChart, latestEnvironmentReading, sortedEnvironmentReadings, wateringPhotoGroups, plantPhotoCount, type EnvironmentChartRange } from '../../core/selectors';
+import { filteredWateringsForPlant, daysAgoLabel, todayStr, latestWateringDate, latestWateringStage, plantTimelineStats, dayCountLabel, formatDateDmy, parseDateDmy, environmentChart, latestEnvironmentReading, sortedEnvironmentReadings, wateringPhotoGroups, plantPhotoCount, setPlantArchived, type EnvironmentChartRange } from '../../core/selectors';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { TopBar, useCycleColor } from '../../app/TopBar';
-import { ArchiveIcon, CheckStroke, DropletIcon, ThermometerIcon } from '../../ui/icons';
+import { ArchiveIcon, CheckStroke, DropletIcon, RestoreIcon, ThermometerIcon } from '../../ui/icons';
 import { deletePlantPhotos, getPlantPhoto, storePlantPhotos } from '../../core/plantPhotoStorage';
+import { PlantArchive } from './PlantArchive';
+import { PlantSubtabs } from './PlantSubtabs';
 import './plants.css';
 
 const FERT_KEYS: [keyof FertAmounts, string][] = [
@@ -16,8 +19,12 @@ const FERT_KEYS: [keyof FertAmounts, string][] = [
 ];
 
 export function Plants() {
-  const { state, update } = useStore();
+  const { state } = useStore();
   const activePlant = state.plants.find((p) => p.id === state.activePlantId) ?? null;
+
+  if (state.plantsView === 'archive') {
+    return <PlantArchive />;
+  }
 
   if (state.plantsView === 'climate') {
     return <ClimateView />;
@@ -30,13 +37,7 @@ export function Plants() {
           <div className="subject-title-wrap"><h1 className="subject-title">Полив</h1></div>
         </div>
         <div className="searchbar">
-          <div className="plants-subtabs">
-            <button className="active">Полив</button>
-            <button onClick={() => update((draft) => { draft.plantsView = 'climate'; })}>
-              Климат <span>{state.environmentReadings.length}</span>
-            </button>
-            <button disabled>Галерея</button>
-          </div>
+          <PlantSubtabs plantId={null} />
         </div>
         <div className="content-scroll">
           <div className="welcome">
@@ -52,8 +53,9 @@ export function Plants() {
 }
 
 function PlantView({ plant }: { plant: Plant }) {
-  const { state, update } = useStore();
+  const { state, update, importState } = useStore();
   const cycleColor = useCycleColor();
+  const isArchived = Number.isFinite(plant.archivedAt);
 
   const search = state.plantsSearch;
   const entries = filteredWateringsForPlant(state, plant.id, search);
@@ -68,7 +70,11 @@ function PlantView({ plant }: { plant: Plant }) {
         color={plant.color}
         onRename={(name) => { if (name) update((draft) => { const p = draft.plants.find((x) => x.id === plant.id); if (p) p.name = name; }); }}
         onCycleColor={() => cycleColor('plant', plant.id)}
-        action={{ label: 'Архив растений появится позже', icon: <ArchiveIcon />, disabled: true }}
+        action={{
+          label: isArchived ? `Вернуть «${plant.name}» из архива` : `Переместить «${plant.name}» в архив`,
+          icon: isArchived ? <RestoreIcon /> : <ArchiveIcon />,
+          onClick: () => importState(setPlantArchived(state, plant.id, isArchived ? null : Date.now())),
+        }}
         meta={
           <div className="plant-header-meta">
             <div className="plant-meta">
@@ -87,11 +93,7 @@ function PlantView({ plant }: { plant: Plant }) {
       />
 
       <div className="searchbar">
-        <div className="plants-subtabs">
-          <button className={state.plantsView === 'watering' ? 'active' : ''} onClick={() => update((draft) => { draft.plantsView = 'watering'; })}>Полив</button>
-          <button className={state.plantsView === 'climate' ? 'active' : ''} onClick={() => update((draft) => { draft.plantsView = 'climate'; })}>Климат <span>{state.environmentReadings.length}</span></button>
-          <button className={state.plantsView === 'gallery' ? 'active' : ''} onClick={() => update((draft) => { draft.plantsView = 'gallery'; })}>Галерея <span>{plantPhotoCount(state, plant.id)}</span></button>
-        </div>
+        <PlantSubtabs plantId={plant.id} photoCount={plantPhotoCount(state, plant.id)} />
         {state.plantsView === 'watering' && (
           <input
             className="search-input"
@@ -165,7 +167,7 @@ function EnvironmentQuickAdd() {
 }
 
 function ClimateView() {
-  const { state, update } = useStore();
+  const { state } = useStore();
   const [range, setRange] = useState<EnvironmentChartRange>('7d');
   const chart = environmentChart(state, range);
   const latest = latestEnvironmentReading(state);
@@ -178,13 +180,10 @@ function ClimateView() {
         <EnvironmentChartView chart={chart} range={range} onRangeChange={setRange} latest={latest} />
       </div>
       <div className="searchbar">
-        <div className="plants-subtabs">
-          <button onClick={() => update((draft) => { draft.plantsView = 'watering'; })}>Полив</button>
-          <button className="active" onClick={() => update((draft) => { draft.plantsView = 'climate'; })}>
-            Климат <span>{state.environmentReadings.length}</span>
-          </button>
-          {state.activePlantId && <button onClick={() => update((draft) => { draft.plantsView = 'gallery'; })}>Галерея</button>}
-        </div>
+        <PlantSubtabs
+          plantId={state.plants.some((plant) => plant.id === state.activePlantId) ? state.activePlantId : null}
+          photoCount={state.activePlantId ? plantPhotoCount(state, state.activePlantId) : 0}
+        />
       </div>
       <div className="content-scroll">
         {readings.length ? (
@@ -618,12 +617,32 @@ function PhotoStrip({ photoIds, onRemove }: { photoIds: string[]; onRemove?: (id
         ))}
       </div>
       {selected && (
-        <div className="plant-photo-lightbox" role="presentation" onClick={() => setSelected(null)}>
-          <button type="button" aria-label="Закрыть просмотр" onClick={() => setSelected(null)}>×</button>
-          <img src={selected} alt="Фотография записи полива" onClick={(e) => e.stopPropagation()} />
-        </div>
+        <PlantPhotoLightbox src={selected} onClose={() => setSelected(null)} />
       )}
     </>
+  );
+}
+
+function PlantPhotoLightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
+
+  return createPortal(
+    <div className="plant-photo-lightbox" role="dialog" aria-modal="true" aria-label="Просмотр фотографии" onClick={onClose}>
+      <button type="button" aria-label="Закрыть просмотр" onClick={onClose}>×</button>
+      <img src={src} alt="Фотография записи полива" onClick={(event) => event.stopPropagation()} />
+    </div>,
+    document.body,
   );
 }
 

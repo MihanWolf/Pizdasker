@@ -1,4 +1,4 @@
-import type { AppMode, AppState, EnvironmentReading, FinanceItem, FinanceOperation, FinanceOperationKind, PlantStage, Watering } from './types';
+import type { AppMode, AppState, EnvironmentReading, FinanceItem, FinanceOperation, FinanceOperationKind, Plant, PlantStage, Watering } from './types';
 
 export function isModeHidden(state: AppState, mode: AppMode): boolean {
   return state.settings.hiddenModes.includes(mode);
@@ -6,6 +6,50 @@ export function isModeHidden(state: AppState, mode: AppMode): boolean {
 
 export function isFinanceAdvanced(state: AppState): boolean {
   return state.settings.financeAdvanced.enabled;
+}
+
+export function activePlants(state: AppState): Plant[] {
+  return state.plants.filter((plant) => !Number.isFinite(plant.archivedAt));
+}
+
+export function archivedPlants(state: AppState, now = new Date()): Plant[] {
+  const plants = state.plants.filter((plant) => Number.isFinite(plant.archivedAt)).slice();
+  const archivedAtOrder = (a: Plant, b: Plant) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0);
+  switch (state.plantsArchiveSort) {
+    case 'name':
+      return plants.sort((a, b) => a.name.localeCompare(b.name, 'ru') || archivedAtOrder(a, b));
+    case 'age':
+      return plants.sort((a, b) => {
+        const ageA = plantTimelineStats(state, a.id, now).ageDays;
+        const ageB = plantTimelineStats(state, b.id, now).ageDays;
+        if (ageA === null) return ageB === null ? archivedAtOrder(a, b) : 1;
+        if (ageB === null) return -1;
+        return ageB - ageA || archivedAtOrder(a, b);
+      });
+    case 'archived':
+      return plants.sort(archivedAtOrder);
+  }
+}
+
+export function setPlantArchived(state: AppState, plantId: string, archivedAt: number | null): AppState {
+  if (!state.plants.some((plant) => plant.id === plantId)) return state;
+  return {
+    ...state,
+    plants: state.plants.map((plant) => {
+      if (plant.id !== plantId) return plant;
+      if (archivedAt !== null) return { ...plant, archivedAt };
+      const restored = { ...plant };
+      delete restored.archivedAt;
+      return restored;
+    }),
+    activePlantId: archivedAt === null
+      ? plantId
+      : state.activePlantId === plantId
+        ? activePlants(state).find((plant) => plant.id !== plantId)?.id ?? null
+        : state.activePlantId,
+    plantsView: archivedAt === null ? 'watering' : 'archive',
+    plantsSearch: archivedAt === null ? state.plantsSearch : '',
+  };
 }
 
 export function todayStr(d = new Date()): string {
@@ -198,6 +242,11 @@ export function wateringPhotoEntries(state: AppState, plantId: string): Watering
     .filter((entry) => entry.plantId === plantId && !!entry.photoIds?.length)
     .slice()
     .sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.createdAt - a.createdAt);
+}
+
+export function latestPlantPhotoId(state: AppState, plantId: string): string | null {
+  const latestEntry = wateringPhotoEntries(state, plantId)[0];
+  return latestEntry?.photoIds?.[0] ?? null;
 }
 
 export function wateringPhotoGroups(state: AppState, plantId: string): { date: string; entries: Watering[] }[] {
@@ -713,7 +762,7 @@ export function wateringAccent(daysAgo: number | null): string {
 }
 
 export function plantsNeedingWater(state: AppState, now = new Date(), limit = 3) {
-  return state.plants
+  return activePlants(state)
     .filter((p) => plantNeedsWater(state, p.id, now))
     .slice()
     .sort((a, b) => (latestWateringDate(state, a.id) || '').localeCompare(latestWateringDate(state, b.id) || ''))
@@ -721,7 +770,7 @@ export function plantsNeedingWater(state: AppState, now = new Date(), limit = 3)
 }
 
 export function plantsNeedingWaterTotal(state: AppState, now = new Date()): number {
-  return state.plants.filter((p) => plantNeedsWater(state, p.id, now)).length;
+  return activePlants(state).filter((p) => plantNeedsWater(state, p.id, now)).length;
 }
 
 export function importantNotes(state: AppState, limit = 3) {

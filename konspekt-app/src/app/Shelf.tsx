@@ -1,6 +1,6 @@
 import { useStore } from '../core/store';
 import { uid, COLOR_VARS, PALETTE } from '../core/types';
-import { subjectProgress, isModeHidden } from '../core/selectors';
+import { activePlants, subjectProgress, isModeHidden } from '../core/selectors';
 import { useNamePrompt } from '../ui/ConfirmDialog';
 import { NAV_MODES } from './modes';
 
@@ -9,6 +9,7 @@ export function Shelf() {
   const namePrompt = useNamePrompt();
 
   const modeButtons = NAV_MODES.filter(({ mode }) => !isModeHidden(state, mode));
+  const plants = activePlants(state);
 
   const addSubject = async () => {
     const name = await namePrompt('Новый предмет', 'Например, История');
@@ -91,7 +92,7 @@ export function Shelf() {
 
       {state.mode === 'plants' && (
         <>
-          {state.plants.map((plant) => {
+          {plants.map((plant) => {
             const count = state.waterings.filter((w) => w.plantId === plant.id).length;
             return (
               <div

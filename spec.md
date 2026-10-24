@@ -107,11 +107,13 @@ app/ ui/   — клей: навигация, диалоги, общие комп
 | `src/core/backupArchive.ts` | ZIP-бэкапы состояния вместе с прикреплёнными фото |
 | `src/app/Shelf.tsx` | Единая полка: иконки режимов + корешки активного раздела + «+» |
 | `src/app/modes.tsx` | `NAV_MODES`: единый список разделов для полки и настроек |
-| `src/app/TopBar.tsx` | Общая шапка раздела: цветная точка, inline-имя, мета, удаление |
+| `src/app/TopBar.tsx` | Общая шапка раздела: цветная точка, inline-имя, мета, контекстное действие |
 | `src/ui/icons.tsx` | Inline-SVG иконки (режимы, флаг, штамп-галочка) |
 | `src/ui/ConfirmDialog.tsx` | `ConfirmProvider` + хуки `useConfirm()`, `useNamePrompt()` |
 | `src/ui/confirm-dialog.css` | Стили диалогов подтверждения и ввода имени |
 | `src/modules/<name>/<Name>.tsx` | Компонент раздела |
+| `src/modules/plants/PlantArchive.tsx` | Библиотека архивированных растений |
+| `src/modules/plants/PlantSubtabs.tsx` | Навигация между журналом, климатом, галереей и архивом растений |
 | `src/modules/<name>/<name>.css` | Стили раздела |
 | `src/modules/BackupBar.tsx` | Нижняя панель: индикатор сохранения + экспорт/импорт/очистка |
 | `src/modules/study/DetailDrawer.tsx` | Боковая панель деталей темы |
@@ -176,7 +178,10 @@ interface FinanceItem {
   done?: boolean; createdAt: number;
 }
 
-interface Plant { id: string; name: string; color: ColorName; createdAt: number; }
+interface Plant {
+  id: string; name: string; color: ColorName; createdAt: number;
+  archivedAt?: number;       // наличие timestamp означает, что растение в архиве
+}
 type PlantStage = 'Росток' | 'Вегетация' | 'Предцвет' | 'Цветение';
 interface FertAmounts { micro: number|null; grow: number|null; bloom: number|null; ripen: number|null; }
 interface Watering {
@@ -235,7 +240,8 @@ interface AppState {
   environmentReadings: EnvironmentReading[]; // общий журнал температуры/влажности с точным временем
   activePlantId: string | null;
   plantsSearch: string;                   // поле поиска раздела «Полив»
-  plantsView: 'watering' | 'climate' | 'gallery'; // активная вкладка раздела
+  plantsView: 'watering' | 'climate' | 'gallery' | 'archive'; // активная вкладка раздела
+  plantsArchiveSort: 'archived' | 'name' | 'age'; // сортировка библиотеки растений
 
   shoppingItems: ShoppingItem[];
   shoppingView: 'current' | 'archive';
@@ -252,7 +258,8 @@ interface AppState {
 ```
 
 `createEmptyState()` возвращает состояние с `mode: 'today'`, `currency: '₽'`,
-пустыми массивами и `onboarding: { active: true, scene: 'birth' }`.
+`plantsArchiveSort: 'archived'`, пустыми массивами и
+`onboarding: { active: true, scene: 'birth' }`.
 
 > **Важно:** при добавлении любого нового поля в `AppState` обязательно
 > синхронизировать три места: `createEmptyState()` (иначе ошибка сборки TS),
@@ -371,6 +378,9 @@ interface Store {
 `plantTimelineStats` (возраст от первой записи и длительность текущей стадии
 от начала последней последовательности этой стадии), `dayCountLabel`,
 `environmentChart` (фильтрация и нормализация точек общего температурно-влажностного графика), `latestEnvironmentReading`.
+`activePlants`, `archivedPlants` (фильтрация и сортировка библиотеки по дате
+архива, названию или возрасту), `latestPlantPhotoId` и `setPlantArchived`
+также являются чистыми селекторами. Архивация сохраняет журнал и фото.
 
 ### 6.5. Задачи
 
@@ -520,8 +530,19 @@ interface Store {
 
 - Полка растений вынесена в общий `Shelf` + активное растение
   (`state.activePlantId`, персистентно).
-- `TopBar`: последний полив (`daysAgoLabel` с иконкой-каплей), удаление
-  растения (каскадно удаляет `waterings`); в метаданных также показаны
+- `Shelf` показывает только активные растения; архивированные остаются в
+  состоянии и бэкапах со всеми записями и фото.
+- Кнопка архивации в `TopBar` перемещает растение в библиотеку; для
+  архивированного растения там доступно отдельное действие возврата. Удаление
+  растения из основного списка не предлагается этой кнопкой.
+- Вкладка «Архив» открывает адаптивную прокручиваемую сетку карточек с последним
+  доступным фото, названием и возрастом от первой записи полива. Карточка
+  открывает обычный журнал архивированного растения. Сортировка библиотеки
+  (дата архива, название, возраст) хранится в `AppState`.
+- Архивированные растения исключены из подборок «Сегодня» и списка полки.
+  Архивация не удаляет и не изменяет записи полива и фотографии; `archivedAt`
+  добавляется к `Plant`. Старые данные без этого поля считаются активными.
+- `TopBar`: последний полив (`daysAgoLabel` с иконкой-каплей); в метаданных также показаны
   длительность текущей стадии и возраст от первой записи полива.
 - Справа от имени растения в шапке — общий график температуры и влажности
   с фиксированными вертикальными шкалами 25–32 °C и 40–70%, и периодами
@@ -774,6 +795,37 @@ cd konspekt-app
 npm run build
 npm run preview   # открыть указанный URL (с учётом base)
 ```
+
+### 12.5. Коммит и push изменений
+
+Когда пользователь просит отправить готовые изменения:
+
+1. Проверь `git status` и включай в коммит только файлы, относящиеся к задаче.
+   Не добавляй посторонние изменения, временные файлы и каталоги вроде
+   `.opencode/` и `.playwright-mcp/`.
+2. Проиндексируй конкретные файлы, а не весь репозиторий, и проверь staged diff:
+
+   ```bash
+   git add <файлы задачи>
+   git diff --cached --check
+   git diff --cached --stat
+   ```
+
+3. Создай короткий коммит с описанием по-английски и добавь trailer:
+
+   ```text
+   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+   ```
+
+4. Отправь коммит в основную ветку:
+
+   ```bash
+   git push origin main
+   ```
+
+5. Убедись, что push завершился успешно, и сообщи пользователю коротко:
+   результат и короткий hash коммита. Не включай несвязанные изменения ради
+   чистого статуса и не создавай пустой коммит.
 
 ---
 

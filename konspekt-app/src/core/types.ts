@@ -86,7 +86,11 @@ export interface Plant {
   name: string;
   color: ColorName;
   createdAt: number;
+  archivedAt?: number;
 }
+
+export type PlantsView = 'watering' | 'climate' | 'gallery' | 'archive';
+export type PlantsArchiveSort = 'archived' | 'name' | 'age';
 
 export type PlantStage = 'Росток' | 'Вегетация' | 'Предцвет' | 'Цветение';
 
@@ -214,7 +218,8 @@ export interface AppState {
   environmentReadings: EnvironmentReading[];
   activePlantId: string | null;
   plantsSearch: string;
-  plantsView: 'watering' | 'climate' | 'gallery';
+  plantsView: PlantsView;
+  plantsArchiveSort: PlantsArchiveSort;
 
   shoppingItems: ShoppingItem[];
   shoppingView: 'current' | 'archive';
@@ -262,6 +267,7 @@ export function createEmptyState(): AppState {
     activePlantId: null,
     plantsSearch: '',
     plantsView: 'watering',
+    plantsArchiveSort: 'archived',
     shoppingItems: [],
     shoppingView: 'current',
     taskProjects: [],

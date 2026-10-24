@@ -7,7 +7,7 @@ import {
   plantsNeedingWater, plantsNeedingWaterTotal, wateringDaysAgo, wateringAccent, daysAgoLabel, latestWateringDate,
   importantNotes, importantNotesTotal,
   topWishes, topWishesTotal,
-  isModeHidden,
+  activePlants, isModeHidden,
 } from '../../core/selectors';
 import { SunIcon, WalletIcon, ChecklistIcon, DropletIcon, QuoteIcon } from '../../ui/icons';
 import './today.css';
@@ -33,7 +33,7 @@ export function Today() {
   const showFinance = !isModeHidden(state, 'finance');
   const showPayments = paymentsTotal > 0 && showFinance;
   const showTasks = tasksTotal > 0 && !isModeHidden(state, 'tasks');
-  const showPlants = state.plants.length > 0 && !isModeHidden(state, 'plants');
+  const showPlants = activePlants(state).length > 0 && !isModeHidden(state, 'plants');
   const showNotes = notesTotal > 0 && !isModeHidden(state, 'notes');
   const showWishes = wishesTotal > 0 && showFinance;
 

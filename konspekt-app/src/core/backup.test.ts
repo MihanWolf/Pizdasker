@@ -76,13 +76,31 @@ describe('importBackup (legacy compatibility)', () => {
       createdAt: 2,
     }];
     original.plantsView = 'climate';
+    original.plantsArchiveSort = 'age';
+    original.plants.push({ id: 'archived', name: 'Фикус', color: 'forest', createdAt: 1, archivedAt: 2 });
     const { state: restored } = importBackup(exportBackup(original));
     const { state: legacy } = importBackup('{"plants":[]}');
 
     expect(restored.environmentReadings).toEqual(original.environmentReadings);
     expect(restored.plantsView).toBe('climate');
+    expect(restored.plantsArchiveSort).toBe('age');
+    expect(restored.plants[0].archivedAt).toBe(2);
     expect(legacy.environmentReadings).toEqual([]);
     expect(legacy.plantsView).toBe('watering');
+    expect(legacy.plantsArchiveSort).toBe('archived');
+  });
+
+  it('round-trips archived plants and the archive library view', () => {
+    const original = createEmptyState();
+    original.plants = [{ id: 'plant-1', name: 'Фикус', color: 'forest', createdAt: 1, archivedAt: 2 }];
+    original.plantsView = 'archive';
+    original.plantsArchiveSort = 'name';
+
+    const { state } = importBackup(exportBackup(original));
+
+    expect(state.plants).toEqual(original.plants);
+    expect(state.plantsView).toBe('archive');
+    expect(state.plantsArchiveSort).toBe('name');
   });
 
   it('round-trips: export(new) -> import(new) preserves data', () => {
@@ -124,6 +142,9 @@ describe('importBackup (legacy compatibility)', () => {
   it('exports a single dashboard and replaces only that dashboard on import', () => {
     const exportedState = createEmptyState();
     exportedState.plants = [{ id: 'plant-new', name: 'Фикус', color: 'forest', createdAt: 1 }];
+    exportedState.plants[0].archivedAt = 10;
+    exportedState.plantsView = 'archive';
+    exportedState.plantsArchiveSort = 'age';
     exportedState.waterings = [{
       id: 'watering-new',
       plantId: 'plant-new',
@@ -142,6 +163,8 @@ describe('importBackup (legacy compatibility)', () => {
     if (parsed.scope !== 'dashboard') throw new Error('Expected dashboard backup');
     expect(parsed.mode).toBe('plants');
     expect(parsed.state.plants).toEqual(exportedState.plants);
+    expect(parsed.state.plantsView).toBe('archive');
+    expect(parsed.state.plantsArchiveSort).toBe('age');
     expect(parsed.state.notePages).toEqual([]);
 
     const targetState = createEmptyState();
@@ -150,6 +173,7 @@ describe('importBackup (legacy compatibility)', () => {
     const replaced = replaceDashboardData(targetState, parsed.state, parsed.mode);
 
     expect(replaced.plants).toEqual(exportedState.plants);
+    expect(replaced.plantsArchiveSort).toBe('age');
     expect(replaced.waterings).toEqual(exportedState.waterings);
     expect(replaced.notePages).toEqual(targetState.notePages);
   });
