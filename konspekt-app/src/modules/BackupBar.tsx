@@ -1,18 +1,41 @@
 import { useRef } from 'react';
 import { useStore } from '../core/store';
-import { DASHBOARD_LABELS, exportDashboardBackup, replaceDashboardData, type DashboardMode } from '../core/backup';
-import type { AppState } from '../core/types';
+import { DASHBOARD_LABELS, DASHBOARD_MODES, exportDashboardBackup, replaceDashboardData, type DashboardMode } from '../core/backup';
+import { createEmptyState, type AppState } from '../core/types';
 import { todayStr } from '../core/selectors';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { exportDashboardArchive } from '../core/backupArchive';
-import { replacePlantPhotos } from '../core/plantPhotoStorage';
+import { clearPlantPhotos, replacePlantPhotos } from '../core/plantPhotoStorage';
 import { readBackupFile } from '../core/backupFile';
-import { DownloadIcon, GearIcon, ImportIcon } from '../ui/icons';
+import { DownloadIcon, GearIcon, ImportIcon, TrashIcon } from '../ui/icons';
 
 export function FooterBar() {
   const { state, saveStatus, retrySave, importState, update } = useStore();
   const confirm = useConfirm();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeDashboard = isDashboardMode(state.mode) ? state.mode : null;
+  const showDeleteSection = activeDashboard !== null && hasDashboardData(state, activeDashboard);
+
+  const handleDeleteSection = async () => {
+    if (!activeDashboard) return;
+    const label = DASHBOARD_LABELS[activeDashboard];
+    const ok = await confirm({
+      title: `Удалить данные раздела «${label}»?`,
+      message: `Все данные раздела «${label}» будут удалены безвозвратно. Данные остальных разделов не изменятся.`,
+      confirmLabel: 'Удалить',
+    });
+    if (!ok) return;
+    try {
+      if (activeDashboard === 'plants') await clearPlantPhotos();
+      importState(replaceDashboardData(state, createEmptyState(), activeDashboard));
+    } catch (error) {
+      await confirm({
+        title: 'Не удалось очистить раздел',
+        message: error instanceof Error ? error.message : 'Неизвестная ошибка локального хранилища.',
+        confirmLabel: 'Понятно',
+      });
+    }
+  };
 
   const handleDashboardExport = async () => {
     const dashboardMode = isDashboardMode(state.mode) ? state.mode : null;
@@ -87,6 +110,16 @@ export function FooterBar() {
         </button>
         <input ref={fileInputRef} type="file" accept="application/json,.json,application/zip,.zip" style={{ display: 'none' }} onChange={handleFileChange} />
         {saveStatus.kind === 'error' && <button className="save-retry" onClick={retrySave}>повторить</button>}
+        {showDeleteSection && activeDashboard && (
+          <button
+            className="footer-icon-btn footer-icon-btn-danger"
+            title={`Удалить данные раздела «${DASHBOARD_LABELS[activeDashboard]}»`}
+            aria-label={`Удалить данные раздела «${DASHBOARD_LABELS[activeDashboard]}»`}
+            onClick={handleDeleteSection}
+          >
+            <TrashIcon />
+          </button>
+        )}
         <button
           className={'footer-settings' + (state.mode === 'settings' ? ' active' : '')}
           title={`Настройки · ${saveStatus.text}`}
@@ -126,5 +159,22 @@ function downloadText(data: string, filename: string) {
 }
 
 function isDashboardMode(mode: AppState['mode']): mode is DashboardMode {
-  return mode === 'finance' || mode === 'tasks' || mode === 'shopping' || mode === 'notes' || mode === 'plants' || mode === 'study';
+  return DASHBOARD_MODES.includes(mode as DashboardMode);
+}
+
+function hasDashboardData(state: AppState, mode: DashboardMode): boolean {
+  switch (mode) {
+    case 'finance':
+      return state.financeItems.length > 0 || state.financeOperations.length > 0 || state.balance !== 0;
+    case 'tasks':
+      return state.taskProjects.length > 0 || state.taskItems.length > 0;
+    case 'shopping':
+      return state.shoppingItems.length > 0;
+    case 'notes':
+      return state.notePages.length > 0 || state.noteEntries.length > 0;
+    case 'plants':
+      return state.plants.length > 0 || state.waterings.length > 0 || state.environmentReadings.length > 0;
+    case 'study':
+      return state.subjects.length > 0 || state.groups.length > 0 || state.topics.length > 0;
+  }
 }

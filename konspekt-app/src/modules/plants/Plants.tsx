@@ -4,7 +4,7 @@ import { uid, COLOR_VARS, PLANT_STAGES, type EnvironmentReading, type Plant, typ
 import { filteredWateringsForPlant, daysAgoLabel, todayStr, latestWateringDate, latestWateringStage, plantTimelineStats, dayCountLabel, formatDateDmy, parseDateDmy, environmentChart, latestEnvironmentReading, sortedEnvironmentReadings, wateringPhotoGroups, plantPhotoCount, type EnvironmentChartRange } from '../../core/selectors';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { TopBar, useCycleColor } from '../../app/TopBar';
-import { CheckStroke, DropletIcon, ThermometerIcon } from '../../ui/icons';
+import { ArchiveIcon, CheckStroke, DropletIcon, ThermometerIcon } from '../../ui/icons';
 import { deletePlantPhotos, getPlantPhoto, storePlantPhotos } from '../../core/plantPhotoStorage';
 import './plants.css';
 
@@ -53,38 +53,12 @@ export function Plants() {
 
 function PlantView({ plant }: { plant: Plant }) {
   const { state, update } = useStore();
-  const confirm = useConfirm();
   const cycleColor = useCycleColor();
 
   const search = state.plantsSearch;
   const entries = filteredWateringsForPlant(state, plant.id, search);
   const lastDate = latestWateringDate(state, plant.id);
   const timeline = plantTimelineStats(state, plant.id);
-
-  const deletePlant = async () => {
-    const ok = await confirm({
-      title: 'Удалить растение?',
-      message: `«${plant.name}» и весь его журнал поливов будут удалены безвозвратно.`,
-      confirmLabel: 'Удалить',
-    });
-    if (!ok) return;
-    const photoIds = state.waterings.filter((w) => w.plantId === plant.id).flatMap((w) => w.photoIds ?? []);
-    try {
-      await deletePlantPhotos(photoIds);
-    } catch {
-      await confirm({
-        title: 'Не удалось удалить фотографии',
-        message: 'Растение и журнал не удалены. Повторите попытку после проверки локального хранилища.',
-        confirmLabel: 'Понятно',
-      });
-      return;
-    }
-    update((draft) => {
-      draft.plants = draft.plants.filter((p) => p.id !== plant.id);
-      draft.waterings = draft.waterings.filter((w) => w.plantId !== plant.id);
-      draft.activePlantId = null;
-    });
-  };
 
   return (
     <>
@@ -94,10 +68,7 @@ function PlantView({ plant }: { plant: Plant }) {
         color={plant.color}
         onRename={(name) => { if (name) update((draft) => { const p = draft.plants.find((x) => x.id === plant.id); if (p) p.name = name; }); }}
         onCycleColor={() => cycleColor('plant', plant.id)}
-        deleteLabel="удалить растение"
-        deleteTitle="Удалить растение?"
-        deleteMessage={`«${plant.name}» и весь его журнал поливов будут удалены безвозвратно.`}
-        onDelete={deletePlant}
+        action={{ label: 'Архив растений появится позже', icon: <ArchiveIcon />, disabled: true }}
         meta={
           <div className="plant-header-meta">
             <div className="plant-meta">

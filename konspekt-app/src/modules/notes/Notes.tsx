@@ -4,6 +4,7 @@ import { uid, COLOR_VARS, type NotePage, type NoteEntry } from '../../core/types
 import { filteredNotesForPage, noteCountLabel } from '../../core/selectors';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { TopBar, useCycleColor } from '../../app/TopBar';
+import { TrashIcon } from '../../ui/icons';
 import './notes.css';
 
 export function Notes() {
@@ -54,10 +55,7 @@ function NotesPageView({ page }: { page: NotePage }) {
         color={page.color}
         onRename={(name) => { if (name) update((draft) => { const p = draft.notePages.find((x) => x.id === page.id); if (p) p.name = name; }); }}
         onCycleColor={() => cycleColor('page', page.id)}
-        deleteLabel="удалить страницу"
-        deleteTitle="Удалить страницу?"
-        deleteMessage={`«${page.name}» и все записи на ней будут удалены безвозвратно.`}
-        onDelete={deletePage}
+        action={{ label: `Удалить страницу «${page.name}»`, icon: <TrashIcon />, onClick: deletePage, variant: 'danger' }}
         meta={<span className="mono">{totalCount} {noteCountLabel(totalCount)}</span>}
       />
 

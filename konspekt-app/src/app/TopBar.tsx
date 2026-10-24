@@ -1,29 +1,26 @@
 import { useStore } from '../core/store';
 import { COLOR_VARS, PALETTE, type ColorName } from '../core/types';
-import { useConfirm } from '../ui/ConfirmDialog';
+
+export interface TopBarAction {
+  label: string;
+  icon: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  variant?: 'danger' | 'neutral';
+}
 
 interface TopBarProps {
   name: string;
   color: ColorName;
   onRename: (name: string) => void;
   onCycleColor: () => void;
-  deleteLabel: string;
-  deleteTitle: string;
-  deleteMessage: string;
-  onDelete: () => void;
+  action: TopBarAction;
   meta: React.ReactNode;
   headerContent?: React.ReactNode;
   className?: string;
 }
 
-export function TopBar({ name, color, onRename, onCycleColor, deleteLabel, deleteTitle, deleteMessage, onDelete, meta, headerContent, className }: TopBarProps) {
-  const confirm = useConfirm();
-
-  const handleDelete = async () => {
-    const ok = await confirm({ title: deleteTitle, message: deleteMessage, confirmLabel: 'Удалить' });
-    if (ok) onDelete();
-  };
-
+export function TopBar({ name, color, onRename, onCycleColor, action, meta, headerContent, className }: TopBarProps) {
   return (
     <div className={`topbar ${className ?? ''}`}>
       <div className="subject-title-wrap">
@@ -42,8 +39,16 @@ export function TopBar({ name, color, onRename, onCycleColor, deleteLabel, delet
       {headerContent}
       <div className="topbar-meta">
         <div className="subject-progress">{meta}</div>
-        <button className="delete-subject" onClick={handleDelete}>{deleteLabel}</button>
       </div>
+      <button
+        className={`topbar-action${action.variant === 'danger' ? ' danger' : ''}`}
+        title={action.label}
+        aria-label={action.label}
+        disabled={action.disabled}
+        onClick={action.onClick}
+      >
+        {action.icon}
+      </button>
     </div>
   );
 }

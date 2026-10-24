@@ -3,7 +3,7 @@ import { useStore } from '../../core/store';
 import { uid, PALETTE, COLOR_VARS, type TaskProject } from '../../core/types';
 import { taskOpenCount, taskProjectItems, filteredTasksForProject, paymentDaysUntil, paymentDueLabel, paymentAccent } from '../../core/selectors';
 import { useConfirm, useNamePrompt } from '../../ui/ConfirmDialog';
-import { ChecklistIcon } from '../../ui/icons';
+import { ChecklistIcon, TrashIcon } from '../../ui/icons';
 import { TaskDrawer } from './TaskDrawer';
 import './tasks.css';
 
@@ -167,7 +167,14 @@ function ProjectView({ project, onOpenTask }: { project: TaskProject; onOpenTask
             </h2>
           </div>
         </div>
-        <button className="task-project-delete" title="Удалить проект" onClick={deleteProject}>×</button>
+        <button
+          className="task-project-delete"
+          title={`Удалить проект «${project.name}»`}
+          aria-label={`Удалить проект «${project.name}»`}
+          onClick={deleteProject}
+        >
+          <TrashIcon />
+        </button>
       </div>
 
       <div className="task-add-row">

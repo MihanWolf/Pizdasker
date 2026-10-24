@@ -19,9 +19,14 @@
 .task-project-head .subject-dot { margin-top: 6px; }
 .task-project-kicker { font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-faint); font-size: 9px; }
 .task-project-title h2 { font-size: 25px; font-style: italic; margin-top: 3px; }
-.task-project-delete { border: 0; background: transparent; color: var(--ink-faint); cursor: pointer; font-size: 19px; opacity: 0; }
-.task-project-title:hover .task-project-delete { opacity: 1; }
-.task-project-delete:hover { color: var(--urgent); }
+.task-project-delete {
+  display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex-shrink: 0;
+  border: 1px solid var(--rule); border-radius: 8px; background: var(--card); color: var(--ink-faint);
+  cursor: pointer; transition: color .15s, background .15s, border-color .15s;
+}
+.task-project-delete svg { width: 17px; height: 17px; }
+.task-project-delete:hover { color: var(--urgent); background: rgba(199,70,45,0.06); border-color: var(--urgent); }
+.task-project-delete:focus-visible { outline: 2px solid var(--urgent); outline-offset: 2px; }
 
 .task-add-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1.5px dashed var(--rule); border-radius: 8px; margin-bottom: 15px; background: rgba(255,255,255,0.35); }
 .task-add-row input[type="text"] { flex: 1; min-width: 0; border: 0; background: transparent; outline: 0; color: var(--ink); font-size: 13.5px; }

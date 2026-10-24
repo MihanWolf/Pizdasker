@@ -4,7 +4,7 @@ import { uid, COLOR_VARS, PALETTE, type Subject, type TopicGroup, type Topic } f
 import { subjectProgress, subjectGroups, ungroupedTopics, groupTopics, filteredTopicsForSubject } from '../../core/selectors';
 import { useConfirm, useNamePrompt } from '../../ui/ConfirmDialog';
 import { TopBar, useCycleColor } from '../../app/TopBar';
-import { CheckStamp, FlagIcon } from '../../ui/icons';
+import { CheckStamp, FlagIcon, TrashIcon } from '../../ui/icons';
 import { DetailDrawer } from './DetailDrawer';
 import './study.css';
 
@@ -72,10 +72,7 @@ function SubjectView({ subject, onOpenTopic }: { subject: Subject; onOpenTopic: 
         color={subject.color}
         onRename={(name) => { if (name) update((draft) => { const s = draft.subjects.find((x) => x.id === subject.id); if (s) s.name = name; }); }}
         onCycleColor={() => cycleColor('subject', subject.id)}
-        deleteLabel="удалить предмет"
-        deleteTitle="Удалить предмет?"
-        deleteMessage={`«${subject.name}» и все его темы и группы будут удалены безвозвратно.`}
-        onDelete={deleteSubject}
+        action={{ label: `Удалить предмет «${subject.name}»`, icon: <TrashIcon />, onClick: deleteSubject, variant: 'danger' }}
         meta={meta}
       />
 

@@ -22,7 +22,7 @@
 .plant-topbar .subject-title { overflow-wrap: anywhere; }
 .plant-topbar .topbar-meta { display: contents; }
 .plant-topbar .subject-progress { grid-column: 1 / -1; grid-row: 2; width: 100%; min-width: 0; }
-.plant-topbar .delete-subject { grid-column: 2; grid-row: 1; align-self: start; justify-self: end; }
+.plant-topbar .topbar-action { grid-column: 2; grid-row: 1; align-self: start; justify-self: end; }
 .plant-header-meta { display: grid; grid-template-columns: minmax(0, 2fr) minmax(88px, .7fr); align-items: stretch; gap: 14px; width: 100%; }
 .plant-header-meta > .plant-meta { justify-content: center; min-width: 0; }
 .plant-header-meta .environment-quick-add { box-sizing: border-box; align-self: center; width: 100%; height: auto; min-width: 0; aspect-ratio: 1; margin: 0; }
