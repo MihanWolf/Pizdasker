@@ -51,6 +51,7 @@ function NotesPageView({ page }: { page: NotePage }) {
   return (
     <>
       <TopBar
+        className="notes-topbar"
         name={page.name}
         color={page.color}
         onRename={(name) => { if (name) update((draft) => { const p = draft.notePages.find((x) => x.id === page.id); if (p) p.name = name; }); }}

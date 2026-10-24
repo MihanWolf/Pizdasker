@@ -285,6 +285,14 @@ body {
   .spine-count { position: static; transform: none; margin-left: 6px; color: rgba(255,255,255,0.85); }
   .add-subject-btn { width: 40px; height: 36px; }
   .topbar, .searchbar, .content-scroll { padding-left: 18px; padding-right: 18px; }
+  .notes-topbar {
+    display: grid; grid-template-columns: minmax(0, 1fr) 40px; grid-template-rows: auto auto;
+    align-items: center; gap: 6px 12px;
+  }
+  .notes-topbar .subject-title-wrap { grid-column: 1; grid-row: 1; width: 100%; }
+  .notes-topbar .subject-title { overflow-wrap: anywhere; }
+  .notes-topbar .topbar-meta { grid-column: 1; grid-row: 2; margin-left: 26px; }
+  .notes-topbar .topbar-action { grid-column: 2; grid-row: 1; margin-left: 0; align-self: start; }
   .mode-switch { flex-direction: row; margin-bottom: 0; margin-right: 4px; }
   .shelf-divider { width: 1px; height: 32px; margin-bottom: 0; margin-right: 6px; }
 }
