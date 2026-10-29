@@ -70,4 +70,5 @@
   .task-add-row { align-items: stretch; flex-wrap: wrap; }
   .task-add-row input[type="text"] { flex-basis: 100%; }
   .task-add-row label { flex: 1; }
+  .task-delete { opacity: 1; }
 }
