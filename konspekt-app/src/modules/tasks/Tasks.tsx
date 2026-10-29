@@ -202,7 +202,7 @@ function ProjectView({ project, onOpenTask }: { project: TaskProject; onOpenTask
           const daysUntil = paymentDaysUntil(item.dueDate);
           const hasNote = !!item.note?.trim();
           return (
-            <div key={item.id} className={'task-row task-row-enter' + (item.done ? ' done' : '')} style={{ ['--task-accent' as string]: COLOR_VARS[project.color] || COLOR_VARS.rust }} onClick={() => onOpenTask(item.id)}>
+            <div key={item.id} className={'task-row task-row-enter' + (item.done ? ' done' : '') + (item.important ? ' task-row-important' : '')} style={{ ['--task-accent' as string]: COLOR_VARS[project.color] || COLOR_VARS.rust }} onClick={() => onOpenTask(item.id)}>
               <button className={'task-check' + (item.done ? ' checked' : '')} aria-label={item.done ? 'Вернуть в задачи' : 'Отметить выполненной'} onClick={(e) => { e.stopPropagation(); toggleDone(item.id); }} />
               <div className="task-row-copy">
                 <strong>{item.title}</strong>

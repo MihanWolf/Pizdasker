@@ -40,6 +40,7 @@
 
 .task-list { width: 100%; }
 .task-row { display: flex; align-items: center; gap: 11px; min-height: 58px; padding: 10px 4px 10px 10px; border-bottom: 1px dashed var(--rule); border-left: 3px solid var(--task-accent, var(--rust)); cursor: pointer; transition: background .15s; }
+.task-row-important + .task-row:not(.task-row-important) { margin-top: 10px; }
 .task-row:hover { background: rgba(255,255,255,0.35); }
 .task-row-enter { animation: task-row-in 0.26s cubic-bezier(.2,.8,.3,1) both; }
 @keyframes task-row-in { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }

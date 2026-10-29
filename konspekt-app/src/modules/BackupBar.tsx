@@ -13,6 +13,7 @@ export function FooterBar() {
   const { state, saveStatus, retrySave, importState, update } = useStore();
   const confirm = useConfirm();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const previousModeRef = useRef<AppState['mode']>(state.mode === 'settings' ? 'today' : state.mode);
   const activeDashboard = isDashboardMode(state.mode) ? state.mode : null;
   const showDeleteSection = activeDashboard !== null && hasDashboardData(state, activeDashboard);
 
@@ -102,13 +103,17 @@ export function FooterBar() {
   return (
     <div className="footer-bar">
       <div className="footer-actions">
-        <button className="footer-icon-btn" title="Экспортировать раздел" aria-label="Экспортировать раздел" onClick={handleDashboardExport}>
-          <DownloadIcon />
-        </button>
-        <button className="footer-icon-btn" title="Импортировать раздел" aria-label="Импортировать раздел" onClick={() => fileInputRef.current?.click()}>
-          <ImportIcon />
-        </button>
-        <input ref={fileInputRef} type="file" accept="application/json,.json,application/zip,.zip" style={{ display: 'none' }} onChange={handleFileChange} />
+        {state.mode !== 'settings' && (
+          <>
+            <button className="footer-icon-btn" title="Экспортировать раздел" aria-label="Экспортировать раздел" onClick={handleDashboardExport}>
+              <DownloadIcon />
+            </button>
+            <button className="footer-icon-btn" title="Импортировать раздел" aria-label="Импортировать раздел" onClick={() => fileInputRef.current?.click()}>
+              <ImportIcon />
+            </button>
+            <input ref={fileInputRef} type="file" accept="application/json,.json,application/zip,.zip" style={{ display: 'none' }} onChange={handleFileChange} />
+          </>
+        )}
         {saveStatus.kind === 'error' && <button className="save-retry" onClick={retrySave}>повторить</button>}
         {showDeleteSection && activeDashboard && (
           <button
@@ -122,9 +127,16 @@ export function FooterBar() {
         )}
         <button
           className={'footer-settings' + (state.mode === 'settings' ? ' active' : '')}
-          title={`Настройки · ${saveStatus.text}`}
-          aria-label={`Настройки. ${saveStatus.text}`}
-          onClick={() => update((draft) => { draft.mode = 'settings'; })}
+          title={`${state.mode === 'settings' ? 'Вернуться на предыдущую страницу' : 'Настройки'} · ${saveStatus.text}`}
+          aria-label={state.mode === 'settings' ? `Вернуться назад. ${saveStatus.text}` : `Настройки. ${saveStatus.text}`}
+          onClick={() => {
+            if (state.mode === 'settings') {
+              update((draft) => { draft.mode = previousModeRef.current; });
+            } else {
+              previousModeRef.current = state.mode;
+              update((draft) => { draft.mode = 'settings'; });
+            }
+          }}
         >
           <GearIcon />
           <span className={'save-dot ' + saveStatus.kind} />
