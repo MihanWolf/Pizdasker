@@ -185,7 +185,7 @@ function hasDashboardData(state: AppState, mode: DashboardMode): boolean {
     case 'notes':
       return state.notePages.length > 0 || state.noteEntries.length > 0;
     case 'plants':
-      return state.plants.length > 0 || state.waterings.length > 0 || state.environmentReadings.length > 0;
+      return state.plants.length > 0 || state.waterings.length > 0 || state.environmentReadings.length > 0 || state.plantProblems.length > 0;
     case 'study':
       return state.subjects.length > 0 || state.groups.length > 0 || state.topics.length > 0;
   }

@@ -1,5 +1,5 @@
 .name-editor {
-  position: fixed; inset: 0; background: rgba(35,38,46,0.35); display: flex; align-items: center; justify-content: center; z-index: 50;
+  position: fixed; inset: 0; background: rgba(35,38,46,0.35); display: flex; align-items: center; justify-content: center; z-index: 1100;
   animation: name-editor-fade 0.15s ease both;
 }
 @keyframes name-editor-fade { from { opacity: 0; } to { opacity: 1; } }

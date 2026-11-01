@@ -1,5 +1,5 @@
 import type { AppMode, AppState } from './types';
-import { createEmptyState, normalizeSettings } from './types';
+import { createEmptyState, normalizePlantProblems, normalizeSettings } from './types';
 
 export const DASHBOARD_MODES = ['finance', 'tasks', 'shopping', 'notes', 'plants', 'study'] as const satisfies readonly AppMode[];
 export type DashboardMode = typeof DASHBOARD_MODES[number];
@@ -91,6 +91,9 @@ function dashboardData(state: AppState, mode: DashboardMode): Partial<AppState> 
         plantsSearch: state.plantsSearch,
         plantsView: state.plantsView,
         plantsArchiveSort: state.plantsArchiveSort,
+        plantProblems: state.plantProblems,
+        plantProblemsSearch: state.plantProblemsSearch,
+        plantProblemsCategory: state.plantProblemsCategory,
       };
     case 'study':
       return {
@@ -128,6 +131,9 @@ function parseDashboardBackup(parsed: unknown): DashboardImportResult {
   for (const key of requiredDashboardKeys(mode)) {
     if (!(key in data)) throw new Error(`В файле отсутствует обязательное поле «${key}».`);
   }
+  if (mode === 'plants' && 'plantProblems' in data && !Array.isArray(data.plantProblems)) {
+    throw new Error('Поле «plantProblems» в файле должно быть списком.');
+  }
   const arrayKeys = mode === 'finance'
     ? ['financeItems', 'financeOperations']
     : mode === 'tasks'
@@ -137,7 +143,7 @@ function parseDashboardBackup(parsed: unknown): DashboardImportResult {
         : mode === 'notes'
           ? ['notePages', 'noteEntries']
           : mode === 'plants'
-            ? ['plants', 'waterings', 'environmentReadings']
+            ? ['plants', 'waterings', 'environmentReadings', ...(Array.isArray(data.plantProblems) ? ['plantProblems'] : [])]
             : ['subjects', 'groups', 'topics'];
   for (const key of arrayKeys) {
     if (!Array.isArray(data[key])) throw new Error(`Поле «${key}» в файле должно быть списком.`);
@@ -185,8 +191,13 @@ export function importBackup(raw: string): ImportResult {
     environmentReadings: Array.isArray(parsed.environmentReadings) ? parsed.environmentReadings : empty.environmentReadings,
     activePlantId: parsed.activePlantId ?? empty.activePlantId,
     plantsSearch: parsed.plantsSearch ?? '',
-    plantsView: parsed.plantsView === 'climate' || parsed.plantsView === 'gallery' || parsed.plantsView === 'archive' ? parsed.plantsView : 'watering',
+    plantsView: parsed.plantsView === 'library' || parsed.plantsView === 'climate' || parsed.plantsView === 'gallery' || parsed.plantsView === 'archive' ? parsed.plantsView : 'watering',
     plantsArchiveSort: parsed.plantsArchiveSort === 'name' || parsed.plantsArchiveSort === 'age' ? parsed.plantsArchiveSort : 'archived',
+    plantProblems: normalizePlantProblems(parsed.plantProblems),
+    plantProblemsSearch: typeof parsed.plantProblemsSearch === 'string' ? parsed.plantProblemsSearch : '',
+    plantProblemsCategory: parsed.plantProblemsCategory === 'deficit' || parsed.plantProblemsCategory === 'excess' || parsed.plantProblemsCategory === 'pest' || parsed.plantProblemsCategory === 'mechanical'
+      ? parsed.plantProblemsCategory
+      : 'all',
     shoppingItems: Array.isArray(parsed.shoppingItems) ? parsed.shoppingItems : empty.shoppingItems,
     shoppingView: parsed.shoppingView === 'archive' ? 'archive' : 'current',
     taskProjects: Array.isArray(parsed.taskProjects) ? parsed.taskProjects : empty.taskProjects,
@@ -238,7 +249,19 @@ export function replaceDashboardData(current: AppState, imported: AppState, mode
     case 'notes':
       return { ...current, notePages: imported.notePages, noteEntries: imported.noteEntries, activeNotePageId: imported.activeNotePageId, notesSearch: imported.notesSearch };
     case 'plants':
-      return { ...current, plants: imported.plants, waterings: imported.waterings, environmentReadings: imported.environmentReadings, activePlantId: imported.activePlantId, plantsSearch: imported.plantsSearch, plantsView: imported.plantsView, plantsArchiveSort: imported.plantsArchiveSort };
+      return {
+        ...current,
+        plants: imported.plants,
+        waterings: imported.waterings,
+        environmentReadings: imported.environmentReadings,
+        activePlantId: imported.activePlantId,
+        plantsSearch: imported.plantsSearch,
+        plantsView: imported.plantsView,
+        plantsArchiveSort: imported.plantsArchiveSort,
+        plantProblems: imported.plantProblems,
+        plantProblemsSearch: imported.plantProblemsSearch,
+        plantProblemsCategory: imported.plantProblemsCategory,
+      };
     case 'study':
       return { ...current, subjects: imported.subjects, groups: imported.groups, topics: imported.topics, activeSubjectId: imported.activeSubjectId, studySearch: imported.studySearch };
   }

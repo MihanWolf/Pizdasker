@@ -312,3 +312,133 @@
   .climate-topbar { align-items: stretch; }
   .climate-topbar .environment-chart { flex-basis: 100%; }
 }
+
+.plant-problem-topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.plant-problem-topbar .subject-title-wrap { width: 100%; min-width: 0; }
+.plant-problem-topbar .subject-title { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.plant-problem-title-actions { display: flex; flex-shrink: 0; gap: 6px; }
+.plant-problem-title-actions button {
+  display: grid; width: 40px; height: 40px; flex-shrink: 0; place-items: center;
+  border: 1px solid var(--rule); border-radius: 9px; background: var(--card); color: var(--ink-soft); cursor: pointer;
+}
+.plant-problem-title-actions button.danger { color: var(--urgent); }
+.plant-problem-title-actions button svg { width: 18px; height: 18px; }
+.plant-problem-title-actions button:hover { background: #fff; color: var(--ink); }
+.plant-problem-title-actions button.danger:hover { color: #fff; background: var(--urgent); border-color: var(--urgent); }
+.plant-problem-category-tag { flex-shrink: 0; padding: 4px 7px; border-radius: 12px; background: rgba(47,119,117,.1); color: var(--teal); font: 9px 'JetBrains Mono', monospace; }
+.plant-problem-add, .plant-problem-back, .plant-problem-compare-section > button,
+.plant-problem-editor-actions button {
+  min-height: 40px; padding: 8px 13px; border: 1px solid var(--rule); border-radius: 8px;
+  background: var(--card); color: var(--ink); cursor: pointer; font: 11px 'JetBrains Mono', monospace;
+}
+.plant-problem-add, .plant-problem-editor-actions button[type="submit"] {
+  border-color: var(--teal); background: var(--teal); color: #fff;
+}
+.plant-problem-toolbar { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+.plant-problem-toolbar .plants-subtabs { overflow-x: auto; margin-bottom: 0; }
+.plant-problem-filters { display: flex; gap: 10px; }
+.plant-problem-filters .search-input { min-width: 0; flex: 1; }
+.plant-problem-filters select, .plant-problem-compare-selects select {
+  min-height: 38px; max-width: 180px; padding: 7px 9px; border: 1px solid var(--rule);
+  border-radius: 6px; background: var(--card); color: var(--ink-soft); font: 11px 'JetBrains Mono', monospace;
+}
+.plant-problem-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); align-content: start; gap: 14px; }
+.plant-problem-card {
+  display: flex; min-width: 0; flex-direction: column; overflow: hidden; padding: 0;
+  border: 1px solid var(--rule); border-radius: 10px; background: var(--card); color: var(--ink);
+  text-align: left; cursor: pointer; box-shadow: 0 2px 8px var(--shadow);
+}
+.plant-problem-card-photo { display: flex; aspect-ratio: 4 / 3; align-items: center; justify-content: center; overflow: hidden; background: rgba(47,119,117,.08); }
+.plant-problem-card-photo img { width: 100%; height: 100%; object-fit: cover; }
+.plant-problem-photo-placeholder { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; padding: 14px; color: var(--ink-faint); font: 10px 'JetBrains Mono', monospace; text-align: center; }
+.plant-problem-photo-error { padding: 10px; color: var(--urgent); font: 10px 'JetBrains Mono', monospace; text-align: center; }
+.plant-problem-card-copy { display: flex; min-width: 0; flex-direction: column; gap: 5px; padding: 10px 12px 12px; }
+.plant-problem-card-copy small, .plant-problem-category { color: var(--teal); font: 10px 'JetBrains Mono', monospace; }
+.plant-problem-card-copy strong { overflow-wrap: anywhere; font-size: 13px; font-weight: 600; }
+.plant-problem-demo-tag { flex-shrink: 0; padding: 4px 7px; border-radius: 12px; background: rgba(170,121,5,.12); color: var(--mustard); font: 9px 'JetBrains Mono', monospace; }
+.plant-problem-empty { grid-column: 1 / -1; }
+.plant-problem-detail-scroll { display: flex; flex-direction: column; gap: 18px; }
+.plant-problem-detail { display: flex; flex-direction: column; gap: 16px; max-width: 900px; }
+.plant-problem-demo-note { padding: 10px 12px; border-left: 3px solid var(--mustard); border-radius: 4px; background: rgba(170,121,5,.08); color: var(--ink-soft); font-size: 12px; }
+.plant-problem-section { padding: 16px; border: 1px solid var(--rule); border-radius: 9px; background: rgba(255,255,255,.32); }
+.plant-problem-section h2, .plant-problem-compare-section h2 { margin-bottom: 8px; font: italic 600 18px 'Fraunces', serif; color: var(--ink); }
+.plant-problem-section p, .plant-problem-compare-section p { color: var(--ink-soft); font-size: 13px; line-height: 1.65; white-space: pre-wrap; }
+.plant-problem-section-heading { display: flex; align-items: baseline; gap: 8px; }
+.plant-problem-section-heading span { color: var(--ink-faint); font: 10px 'JetBrains Mono', monospace; }
+.plant-problem-muted { color: var(--ink-faint) !important; font-style: italic; }
+.plant-problem-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 10px; }
+.plant-problem-photo-tile { position: relative; min-width: 0; overflow: hidden; aspect-ratio: 4 / 3; border-radius: 7px; background: var(--paper); }
+.plant-problem-photo-tile > button:not(.plant-problem-photo-remove) { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: zoom-in; }
+.plant-problem-photo-tile img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.plant-problem-photo-remove { position: absolute; top: 5px; right: 5px; width: 32px; height: 32px; border: 0; border-radius: 50%; background: var(--urgent); color: #fff; cursor: pointer; font-size: 20px; }
+.plant-problem-compare-section { display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid rgba(47,119,117,.25); border-radius: 9px; background: rgba(47,119,117,.06); }
+.plant-problem-compare-section > div { flex: 1; }
+.plant-problem-compare-section h2 { margin-bottom: 4px; }
+.plant-problem-compare-section small { color: var(--ink-faint); font-size: 10px; }
+.plant-problem-compare-section > button:disabled { opacity: .5; cursor: not-allowed; }
+.plant-problem-modal-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 18px; background: rgba(35,38,46,.55); }
+.plant-problem-editor, .plant-problem-comparison {
+  display: flex; width: min(680px, 100%); max-height: min(92dvh, 900px); flex-direction: column; gap: 13px;
+  overflow: auto; padding: 20px; border: 1px solid var(--rule); border-radius: 12px; background: var(--paper); box-shadow: 0 12px 40px rgba(0,0,0,.2);
+}
+.plant-problem-editor-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.plant-problem-editor-head h2 { font: italic 600 22px 'Fraunces', serif; }
+.plant-problem-editor-head > button { width: 40px; height: 40px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-soft); cursor: pointer; font-size: 25px; }
+.plant-problem-editor > label, .plant-problem-compare-selects > label { display: flex; flex-direction: column; gap: 5px; color: var(--ink-soft); font: 10px 'JetBrains Mono', monospace; }
+.plant-problem-editor input:not([type="file"]), .plant-problem-editor select, .plant-problem-editor textarea {
+  width: 100%; min-height: 40px; padding: 9px 10px; border: 1px solid var(--rule); border-radius: 6px;
+  background: var(--card); color: var(--ink); font: 13px Inter, sans-serif;
+}
+.plant-problem-editor textarea { resize: vertical; line-height: 1.5; }
+.plant-problem-editor-photos { display: flex; flex-direction: column; gap: 9px; color: var(--ink-soft); font-size: 12px; }
+.plant-problem-photo-grid.compact { grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); margin-top: 0; }
+.plant-problem-file-picker { display: inline-flex; width: fit-content; min-height: 40px; align-items: center; padding: 8px 12px; border: 1px dashed var(--rule); border-radius: 7px; color: var(--ink-soft); cursor: pointer; font: 10px 'JetBrains Mono', monospace; }
+.plant-problem-file-picker input { display: none; }
+.plant-problem-new-file { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--ink-faint); font-size: 11px; }
+.plant-problem-new-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plant-problem-new-file button { width: 32px; height: 32px; border: 0; background: transparent; color: var(--urgent); cursor: pointer; font-size: 20px; }
+.plant-problem-editor-error { color: var(--urgent); font-size: 12px; }
+.plant-problem-editor-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; }
+.plant-problem-editor-actions button:disabled, .plant-problem-editor-head button:disabled { opacity: .55; cursor: not-allowed; }
+.plant-problem-compare-selects { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.plant-problem-compare-selects select { width: 100%; max-width: none; }
+.plant-problem-compare-modes { display: flex; gap: 6px; }
+.plant-problem-compare-modes button { min-height: 36px; padding: 7px 12px; border: 1px solid var(--rule); border-radius: 7px; background: var(--card); color: var(--ink-soft); cursor: pointer; font: 10px 'JetBrains Mono', monospace; }
+.plant-problem-compare-modes button.active { border-color: var(--teal); background: rgba(47,119,117,.12); color: var(--ink); }
+.plant-problem-compare-pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+.plant-problem-compare-pair figure { min-width: 0; }
+.plant-problem-compare-image { display: flex; width: 100%; aspect-ratio: 4 / 3; align-items: center; justify-content: center; overflow: hidden; border-radius: 8px; background: rgba(47,119,117,.08); }
+.plant-problem-compare-image img { width: 100%; height: 100%; object-fit: contain; }
+.plant-problem-compare-pair figcaption { overflow: hidden; padding-top: 6px; color: var(--ink-soft); font: 11px 'JetBrains Mono', monospace; text-overflow: ellipsis; white-space: nowrap; }
+.plant-problem-slider-wrap { display: flex; flex-direction: column; gap: 10px; }
+.plant-problem-slider { position: relative; width: 100%; overflow: hidden; aspect-ratio: 16 / 10; border-radius: 8px; background: var(--ink); }
+.plant-problem-slider > img, .plant-problem-slider-overlay, .plant-problem-slider-overlay img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.plant-problem-slider-label { position: absolute; bottom: 8px; padding: 5px 7px; border-radius: 4px; background: rgba(0,0,0,.6); color: #fff; font: 9px 'JetBrains Mono', monospace; }
+.plant-problem-slider-label.left { left: 8px; }
+.plant-problem-slider-label.right { right: 8px; }
+.plant-problem-slider-control { display: flex; align-items: center; gap: 10px; color: var(--ink-soft); font: 10px 'JetBrains Mono', monospace; }
+.plant-problem-slider-control input { flex: 1; accent-color: var(--teal); }
+.plant-problem-compare-empty { display: grid; min-height: 180px; place-items: center; padding: 20px; border-radius: 8px; background: rgba(47,119,117,.06); color: var(--ink-faint); font-size: 12px; text-align: center; }
+
+@media (max-width: 720px) {
+  .plant-problem-topbar { align-items: flex-start; }
+  .plant-problem-topbar .subject-title { font-size: clamp(22px, 6vw, 28px); }
+  .plant-problem-add { flex-shrink: 0; padding: 7px 9px; font-size: 9px; }
+  .plant-problem-filters { align-items: stretch; }
+  .plant-problem-filters select { max-width: 120px; font-size: 9px; }
+  .plant-problem-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .plant-problem-card-copy { padding: 9px; }
+  .plant-problem-card-copy strong { font-size: 12px; }
+  .plant-problem-section, .plant-problem-compare-section { padding: 12px; }
+  .plant-problem-compare-section { align-items: stretch; flex-direction: column; }
+  .plant-problem-compare-section > button { width: 100%; }
+  .plant-problem-modal-overlay { align-items: flex-end; padding: 0; }
+  .plant-problem-editor, .plant-problem-comparison {
+    width: 100%; max-height: 94dvh; padding: 16px 14px max(16px, env(safe-area-inset-bottom));
+    border-radius: 16px 16px 0 0;
+  }
+  .plant-problem-compare-selects { grid-template-columns: 1fr; }
+  .plant-problem-compare-pair { gap: 14px; }
+  .plant-problem-compare-pair figcaption { font-size: 10px; }
+  .plant-problem-slider-control { align-items: stretch; flex-direction: column; }
+}

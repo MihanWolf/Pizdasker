@@ -18,18 +18,34 @@ describe('backup archives', () => {
       photoIds: ['photo-one'],
       createdAt: 1,
     }];
+    state.plantProblems = [{
+      id: 'problem-1',
+      title: 'Пятна на листе',
+      description: 'Пример описания',
+      category: 'deficit',
+      cause: '',
+      signs: '',
+      correction: '',
+      photoIds: ['problem-photo'],
+      isDemo: false,
+      createdAt: 2,
+      updatedAt: 2,
+    }];
     const bytes = zipSync({
       'konspekt-backup.json': strToU8(exportBackup(state)),
       'photos/photo-one.webp': new Uint8Array([1, 2, 3]),
+      'photos/problem-photo.png': new Uint8Array([4, 5, 6]),
     });
 
     const imported = await parseBackupArchive(bytes);
 
     expect(imported.state.waterings[0].photoIds).toEqual(['photo-one']);
-    expect(imported.photos).toHaveLength(1);
-    expect(imported.photos[0].id).toBe('photo-one');
-    expect(imported.photos[0].blob.type).toBe('image/webp');
-    expect(Array.from(new Uint8Array(await imported.photos[0].blob.arrayBuffer()))).toEqual([1, 2, 3]);
+    expect(imported.photos).toHaveLength(2);
+    expect(imported.photos.map((photo) => photo.id).sort()).toEqual(['photo-one', 'problem-photo']);
+    const problemPhoto = imported.photos.find((photo) => photo.id === 'problem-photo');
+    if (!problemPhoto) throw new Error('Expected the problem example photo');
+    expect(problemPhoto.blob.type).toBe('image/png');
+    expect(Array.from(new Uint8Array(await problemPhoto.blob.arrayBuffer()))).toEqual([4, 5, 6]);
   });
 
   it('rejects archives with missing attached photos or no manifest', async () => {
@@ -66,9 +82,23 @@ describe('backup archives', () => {
       photoIds: ['photo-one'],
       createdAt: 2,
     }];
+    state.plantProblems = [{
+      id: 'problem-1',
+      title: 'Пятна на листе',
+      description: 'Пример описания',
+      category: 'deficit',
+      cause: '',
+      signs: '',
+      correction: '',
+      photoIds: ['problem-photo'],
+      isDemo: false,
+      createdAt: 3,
+      updatedAt: 3,
+    }];
     const bytes = zipSync({
       'konspekt-dashboard.json': strToU8(exportDashboardBackup(state, 'plants')),
       'photos/photo-one.webp': new Uint8Array([1, 2, 3]),
+      'photos/problem-photo.webp': new Uint8Array([4, 5, 6]),
     });
 
     const imported = await parseBackupArchive(bytes);
@@ -77,6 +107,7 @@ describe('backup archives', () => {
     if (imported.scope !== 'dashboard') throw new Error('Expected dashboard archive');
     expect(imported.mode).toBe('plants');
     expect(imported.state.plants).toEqual(state.plants);
-    expect(imported.photos).toHaveLength(1);
+    expect(imported.state.plantProblems).toEqual(state.plantProblems);
+    expect(imported.photos).toHaveLength(2);
   });
 });

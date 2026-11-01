@@ -89,8 +89,81 @@ export interface Plant {
   archivedAt?: number;
 }
 
-export type PlantsView = 'watering' | 'climate' | 'gallery' | 'archive';
+export type PlantsView = 'watering' | 'library' | 'climate' | 'gallery' | 'archive';
 export type PlantsArchiveSort = 'archived' | 'name' | 'age';
+export type PlantProblemCategory = 'deficit' | 'excess' | 'pest' | 'mechanical';
+export type PlantProblemCategoryFilter = PlantProblemCategory | 'all';
+
+export interface PlantProblem {
+  id: string;
+  title: string;
+  description: string;
+  category: PlantProblemCategory;
+  cause: string;
+  signs: string;
+  correction: string;
+  photoIds: string[];
+  isDemo: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export function createDemoPlantProblems(): PlantProblem[] {
+  const createdAt = Date.now();
+  return [
+    {
+      id: uid(),
+      title: 'Пример карточки: проблема листа',
+      description: 'Кратко опишите конкретную проблему, например дефицит определённого элемента.',
+      category: 'deficit',
+      cause: 'Демо-текст. Добавьте сюда сведения о причине проблемы.',
+      signs: 'Демо-текст. Опишите, как проблема проявляется на листьях.',
+      correction: 'Демо-текст. Укажите, что следует проверить или скорректировать.',
+      photoIds: [],
+      isDemo: true,
+      createdAt,
+      updatedAt: createdAt,
+    },
+    {
+      id: uid(),
+      title: 'Пример карточки: условия ухода',
+      description: 'Кратко опишите, что именно происходит с растением.',
+      category: 'mechanical',
+      cause: 'Демо-текст. Замените его конкретной информацией.',
+      signs: 'Демо-текст. Добавьте характерные визуальные признаки.',
+      correction: 'Демо-текст. Добавьте проверенные шаги корректировки.',
+      photoIds: [],
+      isDemo: true,
+      createdAt: createdAt + 1,
+      updatedAt: createdAt + 1,
+    },
+  ];
+}
+
+export function normalizePlantProblems(raw: unknown): PlantProblem[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((item): PlantProblem[] => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+    const value = item as Partial<PlantProblem>;
+    if (typeof value.id !== 'string' || typeof value.title !== 'string') return [];
+    const createdAt = typeof value.createdAt === 'number' && Number.isFinite(value.createdAt) ? value.createdAt : Date.now();
+    return [{
+      id: value.id,
+      title: value.title,
+      description: typeof value.description === 'string' ? value.description : '',
+      category: value.category === 'deficit' || value.category === 'excess' || value.category === 'pest' || value.category === 'mechanical'
+        ? value.category
+        : 'deficit',
+      cause: typeof value.cause === 'string' ? value.cause : '',
+      signs: typeof value.signs === 'string' ? value.signs : '',
+      correction: typeof value.correction === 'string' ? value.correction : '',
+      photoIds: Array.isArray(value.photoIds) ? value.photoIds.filter((id): id is string => typeof id === 'string') : [],
+      isDemo: value.isDemo === true,
+      createdAt,
+      updatedAt: typeof value.updatedAt === 'number' && Number.isFinite(value.updatedAt) ? value.updatedAt : createdAt,
+    }];
+  });
+}
 
 export type PlantStage = 'Росток' | 'Вегетация' | 'Предцвет' | 'Цветение';
 
@@ -220,6 +293,9 @@ export interface AppState {
   plantsSearch: string;
   plantsView: PlantsView;
   plantsArchiveSort: PlantsArchiveSort;
+  plantProblems: PlantProblem[];
+  plantProblemsSearch: string;
+  plantProblemsCategory: PlantProblemCategoryFilter;
 
   shoppingItems: ShoppingItem[];
   shoppingView: 'current' | 'archive';
@@ -268,6 +344,9 @@ export function createEmptyState(): AppState {
     plantsSearch: '',
     plantsView: 'watering',
     plantsArchiveSort: 'archived',
+    plantProblems: [],
+    plantProblemsSearch: '',
+    plantProblemsCategory: 'all',
     shoppingItems: [],
     shoppingView: 'current',
     taskProjects: [],

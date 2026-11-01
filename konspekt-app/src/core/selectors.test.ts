@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateDailyBudget, dailyBudgetColor, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, latestWateringStage, plantTimelineStats, dayCountLabel, formatDateDmy, parseDateDmy, environmentChart, latestEnvironmentReading, wateringPhotoEntries, wateringPhotoGroups, plantPhotoCount, latestPlantPhotoId, activePlants, archivedPlants, setPlantArchived, plantsNeedingWater, plantsNeedingWaterTotal, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, todayTasks, taskDueSoon, topWishes, todayPaymentsItems, todayPaymentsTotal, sortTopics, subjectProgress, ungroupedTopics, groupTopics, filteredTopicsForSubject, isModeHidden, isFinanceAdvanced, currentOnHandBalance, financePaymentBalanceDelta, financeOperationAmount, financeOperationBalanceEffect, financeOperationEffectiveDate, nearestUnpaidFinancePayment, nearestPlannedFinanceIncome, financeMonthlyTotals, financeWeeklyFlow, financeUpcomingEvents, financeRecentOperations, financeGoalProgress, financePlanSummary } from './selectors';
+import { calculateDailyBudget, dailyBudgetColor, filteredNotesForPage, noteCountLabel, daysAgoLabel, filteredWateringsForPlant, latestWateringStage, plantTimelineStats, dayCountLabel, formatDateDmy, parseDateDmy, environmentChart, latestEnvironmentReading, wateringPhotoEntries, wateringPhotoGroups, plantPhotoCount, latestPlantPhotoId, filteredPlantProblems, plantPhotosForComparison, activePlants, archivedPlants, setPlantArchived, plantsNeedingWater, plantsNeedingWaterTotal, filteredTasksForProject, remainingTotal, sortedFinanceItems, sortedIncomes, fmtMoney, paymentDaysUntil, paymentNeedsAttention, mixHexColors, wateringDaysAgo, plantNeedsWater, todayTasks, taskDueSoon, topWishes, todayPaymentsItems, todayPaymentsTotal, sortTopics, subjectProgress, ungroupedTopics, groupTopics, filteredTopicsForSubject, isModeHidden, isFinanceAdvanced, currentOnHandBalance, financePaymentBalanceDelta, financeOperationAmount, financeOperationBalanceEffect, financeOperationEffectiveDate, nearestUnpaidFinancePayment, nearestPlannedFinanceIncome, financeMonthlyTotals, financeWeeklyFlow, financeUpcomingEvents, financeRecentOperations, financeGoalProgress, financePlanSummary } from './selectors';
 import { createEmptyState } from './types';
 
 describe('calculateDailyBudget', () => {
@@ -663,6 +663,34 @@ describe('watering photo selectors', () => {
       ['2026-10-01', 1],
     ]);
     expect(plantPhotoCount(state, 'p1')).toBe(4);
+  });
+
+  it('filters problem cards by category and searches descriptive fields', () => {
+    const state = createEmptyState();
+    state.plantProblems = [
+      { id: 'one', title: 'Пятна на листе', description: 'Пятна', category: 'deficit', cause: 'Влажность', signs: 'Коричневые пятна', correction: 'Улучшить вентиляцию', photoIds: [], isDemo: false, createdAt: 1, updatedAt: 1 },
+      { id: 'two', title: 'Следы вредителя', description: 'Точки', category: 'pest', cause: 'Осмотр листа', signs: 'Светлые точки', correction: '', photoIds: [], isDemo: false, createdAt: 2, updatedAt: 2 },
+    ];
+
+    expect(filteredPlantProblems(state).map((problem) => problem.id)).toEqual(['one', 'two']);
+    expect(filteredPlantProblems(state, 'вентиляцию').map((problem) => problem.id)).toEqual(['one']);
+    expect(filteredPlantProblems(state, '', 'pest').map((problem) => problem.id)).toEqual(['two']);
+  });
+
+  it('lists comparison photos only from entries of the selected plant, newest first', () => {
+    const state = createEmptyState();
+    const fert = { micro: null, grow: null, bloom: null, ripen: null };
+    state.waterings = [
+      { id: 'older', plantId: 'p1', date: '2026-10-01', water: null, ph: null, fert, note: '', photoIds: ['a'], createdAt: 1 },
+      { id: 'newer', plantId: 'p1', date: '2026-10-05', water: null, ph: null, fert, note: '', photoIds: ['b', 'c'], createdAt: 2 },
+      { id: 'other', plantId: 'p2', date: '2026-10-07', water: null, ph: null, fert, note: '', photoIds: ['d'], createdAt: 3 },
+    ];
+
+    expect(plantPhotosForComparison(state, 'p1')).toEqual([
+      { id: 'b', date: '2026-10-05' },
+      { id: 'c', date: '2026-10-05' },
+      { id: 'a', date: '2026-10-01' },
+    ]);
   });
 });
 

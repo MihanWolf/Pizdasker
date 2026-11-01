@@ -10,14 +10,17 @@ export function PlantSubtabs({ plantId, photoCount = 0 }: { plantId: string | nu
   return (
     <div className="plants-subtabs">
       <button className={state.plantsView === 'watering' ? 'active' : ''} onClick={() => select('watering')}>Полив</button>
-      <button className={state.plantsView === 'climate' ? 'active' : ''} onClick={() => select('climate')}>
-        Климат <span>{state.environmentReadings.length}</span>
-      </button>
       {plantId && (
         <button className={state.plantsView === 'gallery' ? 'active' : ''} onClick={() => select('gallery')}>
           Галерея <span>{photoCount}</span>
         </button>
       )}
+      <button className={state.plantsView === 'climate' ? 'active' : ''} onClick={() => select('climate')}>
+        Климат <span>{state.environmentReadings.length}</span>
+      </button>
+      <button className={state.plantsView === 'library' ? 'active' : ''} onClick={() => select('library')}>
+        Библия <span>{state.plantProblems.length}</span>
+      </button>
       <button className={state.plantsView === 'archive' ? 'active' : ''} onClick={() => select('archive')}>
         Архив <span>{archiveCount}</span>
       </button>

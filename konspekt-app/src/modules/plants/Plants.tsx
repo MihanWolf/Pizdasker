@@ -8,7 +8,9 @@ import { TopBar, useCycleColor } from '../../app/TopBar';
 import { ArchiveIcon, CheckStroke, DropletIcon, RestoreIcon, ThermometerIcon } from '../../ui/icons';
 import { deletePlantPhotos, getPlantPhoto, storePlantPhotos } from '../../core/plantPhotoStorage';
 import { PlantArchive } from './PlantArchive';
+import { PlantProblemLibrary } from './PlantProblemLibrary';
 import { PlantSubtabs } from './PlantSubtabs';
+import { preparePlantPhoto } from './preparePlantPhoto';
 import './plants.css';
 
 const FERT_KEYS: [keyof FertAmounts, string][] = [
@@ -21,6 +23,10 @@ const FERT_KEYS: [keyof FertAmounts, string][] = [
 export function Plants() {
   const { state } = useStore();
   const activePlant = state.plants.find((p) => p.id === state.activePlantId) ?? null;
+
+  if (state.plantsView === 'library') {
+    return <PlantProblemLibrary />;
+  }
 
   if (state.plantsView === 'archive') {
     return <PlantArchive />;
@@ -423,7 +429,7 @@ function QuickAddWatering({ plantId }: { plantId: string }) {
     try {
       const storedPhotos = await Promise.all(photos.map(async (file) => ({
         id: uid(),
-        blob: await preparePhoto(file),
+        blob: await preparePlantPhoto(file),
       })));
       await storePlantPhotos(storedPhotos);
       update((draft) => {
@@ -494,28 +500,6 @@ function QuickAddWatering({ plantId }: { plantId: string }) {
       <button onClick={submit} disabled={!stage || !parseDateDmy(date) || saving}>{saving ? 'Сохраняю…' : 'Добавить'}</button>
     </div>
   );
-}
-
-async function preparePhoto(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  try {
-    const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('Не удалось подготовить фотографию.');
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const compressed = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((blob) => {
-        if (blob) resolve(blob);
-        else reject(new Error('Не удалось сжать фотографию.'));
-      }, 'image/webp', 0.82);
-    });
-    return compressed;
-  } finally {
-    bitmap.close();
-  }
 }
 
 function PlantPhotoGallery({ plantId }: { plantId: string }) {

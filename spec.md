@@ -114,6 +114,8 @@ app/ ui/   — клей: навигация, диалоги, общие комп
 | `src/modules/<name>/<Name>.tsx` | Компонент раздела |
 | `src/modules/plants/PlantArchive.tsx` | Библиотека архивированных растений |
 | `src/modules/plants/PlantSubtabs.tsx` | Навигация между журналом, климатом, галереей и архивом растений |
+| `src/modules/plants/PlantProblemLibrary.tsx` | Справочник проблем растений, карточки, редактор и сравнение фото |
+| `src/modules/plants/preparePlantPhoto.ts` | Общая подготовка и сжатие фото перед локальным сохранением |
 | `src/modules/<name>/<name>.css` | Стили раздела |
 | `src/modules/BackupBar.tsx` | Нижняя панель: индикатор сохранения + экспорт/импорт/очистка |
 | `src/modules/study/DetailDrawer.tsx` | Боковая панель деталей темы |
@@ -182,6 +184,12 @@ interface Plant {
   id: string; name: string; color: ColorName; createdAt: number;
   archivedAt?: number;       // наличие timestamp означает, что растение в архиве
 }
+type PlantProblemCategory = 'deficit' | 'excess' | 'pest' | 'mechanical';
+interface PlantProblem {
+  id: string; title: string; description: string; category: PlantProblemCategory;
+  cause: string; signs: string; correction: string;
+  photoIds: string[]; isDemo: boolean; createdAt: number; updatedAt: number;
+}
 type PlantStage = 'Росток' | 'Вегетация' | 'Предцвет' | 'Цветение';
 interface FertAmounts { micro: number|null; grow: number|null; bloom: number|null; ripen: number|null; }
 interface Watering {
@@ -240,8 +248,11 @@ interface AppState {
   environmentReadings: EnvironmentReading[]; // общий журнал температуры/влажности с точным временем
   activePlantId: string | null;
   plantsSearch: string;                   // поле поиска раздела «Полив»
-  plantsView: 'watering' | 'climate' | 'gallery' | 'archive'; // активная вкладка раздела
+  plantsView: 'watering' | 'library' | 'climate' | 'gallery' | 'archive'; // активная вкладка раздела
   plantsArchiveSort: 'archived' | 'name' | 'age'; // сортировка библиотеки растений
+  plantProblems: PlantProblem[];
+  plantProblemsSearch: string;
+  plantProblemsCategory: PlantProblemCategory | 'all';
 
   shoppingItems: ShoppingItem[];
   shoppingView: 'current' | 'archive';
@@ -542,6 +553,24 @@ interface Store {
 - Архивированные растения исключены из подборок «Сегодня» и списка полки.
   Архивация не удаляет и не изменяет записи полива и фотографии; `archivedAt`
   добавляется к `Plant`. Старые данные без этого поля считаются активными.
+- Вкладка **«Библия»** рядом с «Поливом» — локальная справочная библиотека
+  конкретных проблем растений, не автоматическая диагностика. Карточка имеет
+  одну категорию (дефицит, переизбыток, вредители или механические повреждения),
+  название, краткое описание, причину, признаки на листьях, рекомендации по
+  решению и несколько фото. На странице карточки сначала показаны фото и
+  описание, затем поля «Возникает из-за:», «Проявляется на листьях:» и
+  «Для решения нужно:»; действия редактирования и удаления стоят иконками рядом
+  с названием.
+  Библиотека поддерживает поиск, фильтр категории, добавление, редактирование
+  и удаление карточек. Для пустых/старых хранилищ показываются помеченные
+  демо-шаблоны; удаление шаблона сохраняется.
+- Порядок вкладок раздела: «Полив», «Галерея», «Климат», «Библия», «Архив».
+  «Галерея» показывается, когда выбрано растение.
+- Кнопка сравнения в карточке открывает выбор активного растения и фото из его
+  записей полива. Фото проблемы и растения показываются крупно вертикально друг
+  под другом или накладываются с ползунком. Файлы фотографий хранятся в общем IndexedDB-хранилище; ZIP
+  бэкап раздела «Полив» и полный ZIP-бэкап включают также фото библиотеки.
+  Старые JSON/ZIP-бэкапы без `plantProblems` импортируются с пустой библиотекой.
 - `TopBar`: последний полив (`daysAgoLabel` с иконкой-каплей); в метаданных также показаны
   длительность текущей стадии и возраст от первой записи полива.
 - Справа от имени растения в шапке — общий график температуры и влажности

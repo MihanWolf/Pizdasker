@@ -15,6 +15,13 @@ const PHOTO_TYPES: Record<string, string> = {
   avif: 'image/avif',
 };
 
+function referencedPlantPhotoIds(state: AppState): string[] {
+  return Array.from(new Set([
+    ...state.waterings.flatMap((entry) => entry.photoIds ?? []),
+    ...state.plantProblems.flatMap((problem) => problem.photoIds),
+  ]));
+}
+
 function photoExtension(blob: Blob): string {
   const subtype = blob.type.split('/')[1]?.toLowerCase();
   if (subtype === 'jpeg') return 'jpg';
@@ -23,7 +30,7 @@ function photoExtension(blob: Blob): string {
 }
 
 export async function exportBackupArchive(state: AppState): Promise<Uint8Array> {
-  const referencedIds = Array.from(new Set(state.waterings.flatMap((entry) => entry.photoIds ?? [])));
+  const referencedIds = referencedPlantPhotoIds(state);
   const archive: Record<string, Uint8Array> = {
     [BACKUP_FILE]: strToU8(exportBackup(state)),
   };
@@ -37,7 +44,7 @@ export async function exportBackupArchive(state: AppState): Promise<Uint8Array> 
 }
 
 export async function exportDashboardArchive(state: AppState): Promise<Uint8Array> {
-  const referencedIds = Array.from(new Set(state.waterings.flatMap((entry) => entry.photoIds ?? [])));
+  const referencedIds = referencedPlantPhotoIds(state);
   const archive: Record<string, Uint8Array> = {
     [DASHBOARD_FILE]: strToU8(exportDashboardBackup(state, 'plants')),
   };
@@ -62,9 +69,9 @@ function archivePhotos(files: Record<string, Uint8Array>, state: AppState): Stor
     photos.push({ id, blob: new Blob([data.slice().buffer], { type: PHOTO_TYPES[extension] }) });
   }
 
-  const referencedIds = new Set(state.waterings.flatMap((entry) => entry.photoIds ?? []));
+  const referencedIds = new Set(referencedPlantPhotoIds(state));
   const missing = Array.from(referencedIds).filter((id) => !photoIds.has(id));
-  if (missing.length) throw new Error(`В ZIP-архиве отсутствуют ${missing.length} фото из журнала.`);
+  if (missing.length) throw new Error(`В ZIP-архиве отсутствуют ${missing.length} фото раздела «Полив».`);
   return photos;
 }
 

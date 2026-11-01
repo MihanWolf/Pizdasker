@@ -93,14 +93,55 @@ describe('importBackup (legacy compatibility)', () => {
   it('round-trips archived plants and the archive library view', () => {
     const original = createEmptyState();
     original.plants = [{ id: 'plant-1', name: 'Фикус', color: 'forest', createdAt: 1, archivedAt: 2 }];
-    original.plantsView = 'archive';
+    original.plantsView = 'library';
     original.plantsArchiveSort = 'name';
+    original.plantProblems = [{
+      id: 'problem-1',
+      title: 'Пятна на листе',
+      description: 'Пример описания',
+      category: 'deficit',
+      cause: 'Причина',
+      signs: 'Признаки',
+      correction: 'Корректировка',
+      photoIds: ['problem-photo'],
+      isDemo: false,
+      createdAt: 3,
+      updatedAt: 4,
+    }];
 
     const { state } = importBackup(exportBackup(original));
 
     expect(state.plants).toEqual(original.plants);
-    expect(state.plantsView).toBe('archive');
+    expect(state.plantsView).toBe('library');
     expect(state.plantsArchiveSort).toBe('name');
+    expect(state.plantProblems).toEqual(original.plantProblems);
+  });
+
+  it('defaults the new plant library fields for older backups', () => {
+    const { state } = importBackup('{"plants":[]}');
+
+    expect(state.plantProblems).toEqual([]);
+    expect(state.plantProblemsSearch).toBe('');
+    expect(state.plantProblemsCategory).toBe('all');
+  });
+
+  it('moves old problem categories to the new category set on import', () => {
+    const { state } = importBackup(JSON.stringify({
+      plantProblems: ['disease', 'nutrition', 'care', 'pest'].map((category, index) => ({
+        id: `problem-${index}`,
+        title: `Problem ${index}`,
+        category,
+      })),
+      plantProblemsCategory: 'nutrition',
+    }));
+
+    expect(state.plantProblems.map((problem) => problem.category)).toEqual([
+      'deficit',
+      'deficit',
+      'deficit',
+      'pest',
+    ]);
+    expect(state.plantProblemsCategory).toBe('all');
   });
 
   it('round-trips: export(new) -> import(new) preserves data', () => {
@@ -143,8 +184,21 @@ describe('importBackup (legacy compatibility)', () => {
     const exportedState = createEmptyState();
     exportedState.plants = [{ id: 'plant-new', name: 'Фикус', color: 'forest', createdAt: 1 }];
     exportedState.plants[0].archivedAt = 10;
-    exportedState.plantsView = 'archive';
     exportedState.plantsArchiveSort = 'age';
+    exportedState.plantsView = 'library';
+    exportedState.plantProblems = [{
+      id: 'problem-exported',
+      title: 'Пример',
+      description: 'Описание',
+      category: 'mechanical',
+      cause: '',
+      signs: '',
+      correction: '',
+      photoIds: [],
+      isDemo: false,
+      createdAt: 1,
+      updatedAt: 1,
+    }];
     exportedState.waterings = [{
       id: 'watering-new',
       plantId: 'plant-new',
@@ -163,8 +217,9 @@ describe('importBackup (legacy compatibility)', () => {
     if (parsed.scope !== 'dashboard') throw new Error('Expected dashboard backup');
     expect(parsed.mode).toBe('plants');
     expect(parsed.state.plants).toEqual(exportedState.plants);
-    expect(parsed.state.plantsView).toBe('archive');
+    expect(parsed.state.plantsView).toBe('library');
     expect(parsed.state.plantsArchiveSort).toBe('age');
+    expect(parsed.state.plantProblems).toEqual(exportedState.plantProblems);
     expect(parsed.state.notePages).toEqual([]);
 
     const targetState = createEmptyState();
@@ -174,6 +229,7 @@ describe('importBackup (legacy compatibility)', () => {
 
     expect(replaced.plants).toEqual(exportedState.plants);
     expect(replaced.plantsArchiveSort).toBe('age');
+    expect(replaced.plantProblems).toEqual(exportedState.plantProblems);
     expect(replaced.waterings).toEqual(exportedState.waterings);
     expect(replaced.notePages).toEqual(targetState.notePages);
   });

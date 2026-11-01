@@ -1,4 +1,4 @@
-import type { AppMode, AppState, EnvironmentReading, FinanceItem, FinanceOperation, FinanceOperationKind, Plant, PlantStage, Watering } from './types';
+import type { AppMode, AppState, EnvironmentReading, FinanceItem, FinanceOperation, FinanceOperationKind, Plant, PlantProblem, PlantProblemCategoryFilter, PlantStage, Watering } from './types';
 
 export function isModeHidden(state: AppState, mode: AppMode): boolean {
   return state.settings.hiddenModes.includes(mode);
@@ -263,6 +263,28 @@ export function plantPhotoCount(state: AppState, plantId: string): number {
   return state.waterings
     .filter((entry) => entry.plantId === plantId)
     .reduce((total, entry) => total + (entry.photoIds?.length ?? 0), 0);
+}
+
+export function filteredPlantProblems(
+  state: AppState,
+  search = state.plantProblemsSearch,
+  category: PlantProblemCategoryFilter = state.plantProblemsCategory,
+): PlantProblem[] {
+  const query = search.trim().toLocaleLowerCase('ru-RU');
+  return state.plantProblems
+    .filter((problem) => category === 'all' || problem.category === category)
+    .filter((problem) => !query || [problem.title, problem.cause, problem.signs, problem.correction]
+      .some((value) => value.toLocaleLowerCase('ru-RU').includes(query)))
+    .slice()
+    .sort((a, b) => a.title.localeCompare(b.title, 'ru-RU'));
+}
+
+export function plantPhotosForComparison(state: AppState, plantId: string): { id: string; date: string }[] {
+  return state.waterings
+    .filter((entry) => entry.plantId === plantId && !!entry.photoIds?.length)
+    .slice()
+    .sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.createdAt - a.createdAt)
+    .flatMap((entry) => (entry.photoIds ?? []).map((id) => ({ id, date: entry.date })));
 }
 
 export type EnvironmentChartRange = '7d' | '30d' | 'all';

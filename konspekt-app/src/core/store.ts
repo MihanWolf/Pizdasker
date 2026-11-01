@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { AppState } from './types';
-import { createEmptyState, normalizeSettings } from './types';
+import { createDemoPlantProblems, createEmptyState, normalizePlantProblems, normalizeSettings } from './types';
 import { loadRawState, saveRawState } from './storage';
 
 interface SaveStatus {
@@ -85,16 +85,31 @@ export const useStore = create<Store>((set, get) => ({
       try {
         const parsed = JSON.parse(raw) as Partial<AppState>;
         const merged: AppState = { ...createEmptyState(), ...parsed };
+        const needsPlantProblemSeed = !Array.isArray(parsed.plantProblems);
+        merged.plantProblems = needsPlantProblemSeed ? createDemoPlantProblems() : normalizePlantProblems(parsed.plantProblems);
+        merged.plantProblemsSearch = typeof parsed.plantProblemsSearch === 'string' ? parsed.plantProblemsSearch : '';
+        merged.plantProblemsCategory = parsed.plantProblemsCategory === 'deficit' ||
+          parsed.plantProblemsCategory === 'excess' ||
+          parsed.plantProblemsCategory === 'pest' ||
+          parsed.plantProblemsCategory === 'mechanical'
+          ? parsed.plantProblemsCategory
+          : 'all';
+        if (!['watering', 'library', 'climate', 'gallery', 'archive'].includes(merged.plantsView)) {
+          merged.plantsView = 'watering';
+        }
         // онбординг включаем только если данных реально ещё нет — как в текущей логике storage.js
         if (!parsed.onboarding || typeof parsed.onboarding.active !== 'boolean') {
           merged.onboarding = { active: !hasAnyUserData(merged), scene: 'birth' };
         }
         set({ state: withActiveIdFallbacks(merged), saveStatus: { kind: 'saved', text: 'Данные загружены' } });
+        if (needsPlantProblemSeed) void queueSave(get, set);
       } catch {
         set({ saveStatus: { kind: 'idle', text: 'Новый список' } });
       }
     } else {
-      set({ saveStatus: { kind: 'idle', text: 'Новый список' } });
+      const initialState = createEmptyState();
+      initialState.plantProblems = createDemoPlantProblems();
+      set({ state: initialState, saveStatus: { kind: 'idle', text: 'Новый список' } });
     }
     set({ loaded: true });
   },
