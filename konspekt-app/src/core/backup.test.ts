@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DASHBOARD_MODES, exportBackup, exportDashboardBackup, importBackup, importBackupFile, replaceDashboardData } from './backup';
+import { DASHBOARD_MODES, exportBackup, exportDashboardBackup, exportTaskProjectBackup, importBackup, importBackupFile, replaceDashboardData, replaceTaskProjectData } from './backup';
 import { createEmptyState } from './types';
 
 // Это ровно то, что выгружает footer-export в старой (vanilla) версии —
@@ -232,6 +232,77 @@ describe('importBackup (legacy compatibility)', () => {
     expect(replaced.plantProblems).toEqual(exportedState.plantProblems);
     expect(replaced.waterings).toEqual(exportedState.waterings);
     expect(replaced.notePages).toEqual(targetState.notePages);
+  });
+
+  it('exports only the open task project and its tasks', () => {
+    const state = createEmptyState();
+    state.taskProjects = [
+      { id: 'tp1', name: 'Дом', color: 'rust', createdAt: 1 },
+      { id: 'tp2', name: 'Работа', color: 'teal', createdAt: 2 },
+    ];
+    state.taskItems = [
+      { id: 'ti1', projectId: 'tp1', title: 'Покрасить', important: false, done: false, createdAt: 3, completedAt: null },
+      { id: 'ti2', projectId: 'tp2', title: 'Отчёт', important: true, done: true, createdAt: 4, completedAt: 5 },
+    ];
+    state.activeTaskProjectId = 'tp2';
+    state.tasksView = 'archive';
+
+    const imported = importBackupFile(exportTaskProjectBackup(state, 'tp2'));
+
+    expect(imported.scope).toBe('project');
+    expect(imported.state.taskProjects).toEqual([state.taskProjects[1]]);
+    expect(imported.state.taskItems).toEqual([state.taskItems[1]]);
+    expect(imported.state.activeTaskProjectId).toBe('tp2');
+    expect(imported.state.tasksView).toBe('archive');
+  });
+
+  it('imports one task project into the open project without changing other projects', () => {
+    const current = createEmptyState();
+    current.taskProjects = [
+      { id: 'current', name: 'Мой проект', color: 'rust', createdAt: 1 },
+      { id: 'other', name: 'Другой проект', color: 'plum', createdAt: 2 },
+    ];
+    current.taskItems = [
+      { id: 'replace-me', projectId: 'current', title: 'Старое', important: false, done: false, createdAt: 3, completedAt: null },
+      { id: 'duplicate-id', projectId: 'other', title: 'Не менять', important: false, done: false, createdAt: 4, completedAt: null },
+    ];
+    current.activeTaskProjectId = 'current';
+    current.tasksView = 'current';
+
+    const source = createEmptyState();
+    source.taskProjects = [{ id: 'incoming', name: 'Импортированный', color: 'forest', createdAt: 5 }];
+    source.taskItems = [
+      { id: 'duplicate-id', projectId: 'incoming', title: 'Новая задача', important: true, done: false, createdAt: 6, completedAt: null },
+    ];
+    source.activeTaskProjectId = 'incoming';
+    source.tasksView = 'archive';
+
+    const replaced = replaceTaskProjectData(current, source);
+
+    expect(replaced.taskProjects).toEqual([
+      { id: 'current', name: 'Импортированный', color: 'forest', createdAt: 5 },
+      current.taskProjects[1],
+    ]);
+    expect(replaced.taskItems).toEqual([
+      current.taskItems[1],
+      { ...source.taskItems[0], id: 'duplicate-id-import-1', projectId: 'current' },
+    ]);
+    expect(replaced.activeTaskProjectId).toBe('current');
+    expect(replaced.tasksView).toBe('archive');
+  });
+
+  it('adds an imported task project when no project is open yet', () => {
+    const current = createEmptyState();
+    const source = createEmptyState();
+    source.taskProjects = [{ id: 'incoming', name: 'Импортированный', color: 'forest', createdAt: 1 }];
+    source.taskItems = [{ id: 'item', projectId: 'incoming', title: 'Шаг', important: false, done: false, createdAt: 2, completedAt: null }];
+    source.activeTaskProjectId = 'incoming';
+
+    const imported = replaceTaskProjectData(current, source);
+
+    expect(imported.taskProjects).toEqual(source.taskProjects);
+    expect(imported.taskItems).toEqual(source.taskItems);
+    expect(imported.activeTaskProjectId).toBe('incoming');
   });
 
   it('round-trips an empty export for every standalone dashboard', () => {

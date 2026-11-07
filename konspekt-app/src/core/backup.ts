@@ -1,5 +1,5 @@
-import type { AppMode, AppState } from './types';
-import { createEmptyState, normalizePlantProblems, normalizeSettings } from './types';
+import type { AppMode, AppState, TaskItem, TaskProject } from './types';
+import { createEmptyState, normalizePlantProblems, normalizeSettings, PALETTE } from './types';
 
 export const DASHBOARD_MODES = ['finance', 'tasks', 'shopping', 'notes', 'plants', 'study'] as const satisfies readonly AppMode[];
 export type DashboardMode = typeof DASHBOARD_MODES[number];
@@ -47,11 +47,15 @@ export interface DashboardImportResult extends ImportResult {
   scope: 'dashboard';
 }
 
+export interface TaskProjectImportResult extends ImportResult {
+  scope: 'project';
+}
+
 export interface FullBackupImportResult extends ImportResult {
   scope: 'all';
 }
 
-export type BackupFileImportResult = DashboardImportResult | FullBackupImportResult;
+export type BackupFileImportResult = DashboardImportResult | TaskProjectImportResult | FullBackupImportResult;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -160,6 +164,60 @@ function parseDashboardBackup(parsed: unknown): DashboardImportResult {
   return { state: normalized.state, exportedAt, mode, scope: 'dashboard' };
 }
 
+function isTaskProject(value: unknown): value is TaskProject {
+  return isRecord(value)
+    && typeof value.id === 'string'
+    && value.id.length > 0
+    && typeof value.name === 'string'
+    && value.name.trim().length > 0
+    && PALETTE.includes(value.color as TaskProject['color'])
+    && typeof value.createdAt === 'number'
+    && Number.isFinite(value.createdAt);
+}
+
+function isTaskItem(value: unknown, projectId: string): value is TaskItem {
+  return isRecord(value)
+    && typeof value.id === 'string'
+    && value.id.length > 0
+    && typeof value.projectId === 'string'
+    && value.projectId === projectId
+    && typeof value.title === 'string'
+    && typeof value.important === 'boolean'
+    && typeof value.done === 'boolean'
+    && typeof value.createdAt === 'number'
+    && Number.isFinite(value.createdAt)
+    && (value.completedAt === null || (typeof value.completedAt === 'number' && Number.isFinite(value.completedAt)))
+    && (value.dueDate === undefined || typeof value.dueDate === 'string')
+    && (value.note === undefined || typeof value.note === 'string');
+}
+
+function parseTaskProjectBackup(parsed: unknown): TaskProjectImportResult {
+  if (!isRecord(parsed) || parsed.format !== DASHBOARD_FORMAT || parsed.version !== DASHBOARD_VERSION || parsed.mode !== 'tasks' || parsed.scope !== 'project') {
+    throw new Error('Файл не является поддерживаемым бэкапом проекта задач.');
+  }
+  if (!isRecord(parsed.data)) throw new Error('В файле отсутствуют данные проекта.');
+
+  const project = parsed.data.taskProject;
+  const taskItems = parsed.data.taskItems;
+  if (!isTaskProject(project)) throw new Error('Данные проекта в файле повреждены.');
+  if (!Array.isArray(taskItems) || !taskItems.every((item) => isTaskItem(item, project.id))) {
+    throw new Error('Список задач в файле повреждён или относится к другому проекту.');
+  }
+  if (parsed.data.tasksView !== 'current' && parsed.data.tasksView !== 'archive') {
+    throw new Error('В файле указана неизвестная вкладка проекта.');
+  }
+
+  const exportedAt = typeof parsed.exportedAt === 'string' ? parsed.exportedAt : null;
+  const normalized = importBackup(JSON.stringify({
+    taskProjects: [project],
+    taskItems,
+    activeTaskProjectId: project.id,
+    tasksView: parsed.data.tasksView,
+    exportedAt,
+  }));
+  return { state: normalized.state, exportedAt, scope: 'project' };
+}
+
 // Разбирает файл бэкапа (строка JSON) в типизированный AppState.
 // Отсутствующие поля подставляются из createEmptyState() — так же, как
 // storage.js в старой версии подставлял `|| []` на каждое поле при загрузке.
@@ -228,14 +286,72 @@ export function exportDashboardBackup(state: AppState, mode: DashboardMode): str
   }, null, 2);
 }
 
+export function exportTaskProjectBackup(state: AppState, projectId: string): string {
+  const project = state.taskProjects.find((item) => item.id === projectId);
+  if (!project) throw new Error('Не удалось найти открытый проект задач.');
+
+  return JSON.stringify({
+    format: DASHBOARD_FORMAT,
+    version: DASHBOARD_VERSION,
+    mode: 'tasks',
+    scope: 'project',
+    exportedAt: new Date().toISOString(),
+    data: {
+      taskProject: project,
+      taskItems: state.taskItems.filter((item) => item.projectId === projectId),
+      tasksView: state.tasksView,
+    },
+  }, null, 2);
+}
+
 export function importDashboardBackup(raw: string): DashboardImportResult {
   return parseDashboardBackup(JSON.parse(raw) as unknown);
 }
 
 export function importBackupFile(raw: string): BackupFileImportResult {
   const parsed = JSON.parse(raw) as unknown;
-  if (isRecord(parsed) && parsed.format === DASHBOARD_FORMAT) return parseDashboardBackup(parsed);
+  if (isRecord(parsed) && parsed.format === DASHBOARD_FORMAT) {
+    if (parsed.scope === 'project') return parseTaskProjectBackup(parsed);
+    return parseDashboardBackup(parsed);
+  }
   return { ...importBackup(raw), scope: 'all' };
+}
+
+export function replaceTaskProjectData(current: AppState, imported: AppState): AppState {
+  const importedProject = imported.taskProjects.find((project) => project.id === imported.activeTaskProjectId)
+    ?? imported.taskProjects[0];
+  if (!importedProject) throw new Error('В файле нет проекта задач для импорта.');
+
+  const targetProject = current.taskProjects.find((project) => project.id === current.activeTaskProjectId)
+    ?? current.taskProjects[0];
+  const targetProjectId = targetProject?.id ?? importedProject.id;
+  const nextProject = { ...importedProject, id: targetProjectId };
+  const taskProjects = targetProject
+    ? current.taskProjects.map((project) => project.id === targetProjectId ? nextProject : project)
+    : [...current.taskProjects, nextProject];
+
+  const taskItems = current.taskItems.filter((item) => item.projectId !== targetProjectId);
+  const existingTaskIds = new Set(taskItems.map((item) => item.id));
+  const importedItems = imported.taskItems
+    .filter((item) => item.projectId === importedProject.id)
+    .map((item) => {
+      let id = item.id;
+      let suffix = 1;
+      while (existingTaskIds.has(id)) {
+        id = `${item.id}-import-${suffix}`;
+        suffix += 1;
+      }
+      existingTaskIds.add(id);
+      return { ...item, id, projectId: targetProjectId };
+    });
+
+  return {
+    ...current,
+    taskProjects,
+    taskItems: [...taskItems, ...importedItems],
+    activeTaskProjectId: targetProjectId,
+    tasksView: imported.tasksView,
+  };
 }
 
 export function replaceDashboardData(current: AppState, imported: AppState, mode: DashboardMode): AppState {

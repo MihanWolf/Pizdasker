@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { useStore } from '../core/store';
-import { DASHBOARD_LABELS, DASHBOARD_MODES, exportDashboardBackup, replaceDashboardData, type DashboardMode } from '../core/backup';
+import { DASHBOARD_LABELS, DASHBOARD_MODES, exportDashboardBackup, exportTaskProjectBackup, replaceDashboardData, replaceTaskProjectData, type DashboardMode } from '../core/backup';
 import { createEmptyState, type AppState } from '../core/types';
 import { todayStr } from '../core/selectors';
 import { useConfirm } from '../ui/ConfirmDialog';
@@ -50,7 +50,18 @@ export function FooterBar() {
     }
 
     try {
-      if (dashboardMode === 'plants') {
+      if (dashboardMode === 'tasks') {
+        const project = state.taskProjects.find((item) => item.id === state.activeTaskProjectId);
+        if (!project) {
+          await confirm({
+            title: 'Нет открытого проекта',
+            message: 'Создай или открой проект задач, чтобы экспортировать его.',
+            confirmLabel: 'Понятно',
+          });
+          return;
+        }
+        downloadText(exportTaskProjectBackup(state, project.id), `konspekt-tasks-${todayStr()}.json`);
+      } else if (dashboardMode === 'plants') {
         const payload = await exportDashboardArchive(state);
         downloadFile(payload.slice().buffer as ArrayBuffer, `konspekt-poliv-${todayStr()}.zip`, 'application/zip');
       } else {
@@ -72,7 +83,7 @@ export function FooterBar() {
     void (async () => {
       try {
         const prepared = await readBackupFile(file);
-        if (prepared.scope !== 'dashboard') {
+        if (prepared.scope === 'all') {
           await confirm({
             title: 'Это полный бэкап',
             message: 'Импорт полного бэкапа доступен в настройках. Здесь можно импортировать только данные отдельного раздела.',
@@ -80,16 +91,31 @@ export function FooterBar() {
           });
           return;
         }
+        const taskProjectImport = prepared.scope === 'project' || (prepared.scope === 'dashboard' && prepared.mode === 'tasks');
+        const importedProject = taskProjectImport
+          ? prepared.state.taskProjects.find((project) => project.id === prepared.state.activeTaskProjectId) ?? prepared.state.taskProjects[0]
+          : null;
+        const currentProject = state.taskProjects.find((project) => project.id === state.activeTaskProjectId) ?? state.taskProjects[0];
         const dateSuffix = prepared.exportedAt ? ` (бэкап от ${new Date(prepared.exportedAt).toLocaleDateString('ru-RU')})` : '';
-        const dashboardLabel = DASHBOARD_LABELS[prepared.mode];
+        const dashboardLabel = prepared.scope === 'dashboard' ? DASHBOARD_LABELS[prepared.mode] : '';
         const ok = await confirm({
-          title: `Импортировать раздел «${dashboardLabel}»?`,
-          message: `Данные раздела «${dashboardLabel}» будут заменены данными из файла${dateSuffix}. Остальные разделы не изменятся.`,
+          title: taskProjectImport
+            ? `Импортировать проект «${importedProject?.name ?? 'Задачи'}»?`
+            : `Импортировать раздел «${dashboardLabel}»?`,
+          message: taskProjectImport
+            ? currentProject
+              ? `Содержимое открытого проекта «${currentProject.name}» будет заменено проектом из файла${dateSuffix}. Остальные проекты не изменятся.`
+              : `Проект из файла будет добавлен в список задач${dateSuffix}.`
+            : `Данные раздела «${dashboardLabel}» будут заменены данными из файла${dateSuffix}. Остальные разделы не изменятся.`,
           confirmLabel: 'Импортировать',
         });
         if (!ok) return;
-        if (prepared.mode === 'plants') await replacePlantPhotos(prepared.photos ?? []);
-        importState(replaceDashboardData(state, prepared.state, prepared.mode));
+        if (taskProjectImport) {
+          importState(replaceTaskProjectData(state, prepared.state));
+        } else if (prepared.scope === 'dashboard') {
+          if (prepared.mode === 'plants') await replacePlantPhotos(prepared.photos ?? []);
+          importState(replaceDashboardData(state, prepared.state, prepared.mode));
+        }
       } catch (error) {
         await confirm({
           title: 'Не удалось импортировать файл',

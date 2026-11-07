@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { useStore } from '../../core/store';
-import { DASHBOARD_LABELS, replaceDashboardData } from '../../core/backup';
+import { DASHBOARD_LABELS, replaceDashboardData, replaceTaskProjectData } from '../../core/backup';
 import { createEmptyState } from '../../core/types';
 import { todayStr } from '../../core/selectors';
 import { exportBackupArchive } from '../../core/backupArchive';
@@ -35,13 +35,26 @@ export function BackupSettings() {
       try {
         const prepared = await readBackupFile(file);
         const dateSuffix = prepared.exportedAt ? ` (бэкап от ${new Date(prepared.exportedAt).toLocaleDateString('ru-RU')})` : '';
+        const isTaskProject = prepared.scope === 'project' || (prepared.scope === 'dashboard' && prepared.mode === 'tasks');
+        const importedProject = isTaskProject
+          ? prepared.state.taskProjects.find((project) => project.id === prepared.state.activeTaskProjectId) ?? prepared.state.taskProjects[0]
+          : null;
+        const currentProject = state.taskProjects.find((project) => project.id === state.activeTaskProjectId) ?? state.taskProjects[0];
         const isDashboard = prepared.scope === 'dashboard';
         const dashboardLabel = isDashboard ? DASHBOARD_LABELS[prepared.mode] : '';
         const ok = await confirm({
-          title: isDashboard ? `Импортировать раздел «${dashboardLabel}»?` : 'Импортировать данные?',
-          message: isDashboard
-            ? `Данные раздела «${dashboardLabel}» будут заменены данными из файла${dateSuffix}. Остальные разделы не изменятся.`
-            : `Всё, что сейчас есть в приложении, будет заменено содержимым файла${dateSuffix}. Действие необратимо — если нужно, сначала сделай экспорт текущих данных.`,
+          title: isTaskProject
+            ? `Импортировать проект «${importedProject?.name ?? 'Задачи'}»?`
+            : isDashboard
+              ? `Импортировать раздел «${dashboardLabel}»?`
+              : 'Импортировать данные?',
+          message: isTaskProject
+            ? currentProject
+              ? `Содержимое открытого проекта «${currentProject.name}» будет заменено проектом из файла${dateSuffix}. Остальные проекты не изменятся.`
+              : `Проект из файла будет добавлен в список задач${dateSuffix}.`
+            : isDashboard
+              ? `Данные раздела «${dashboardLabel}» будут заменены данными из файла${dateSuffix}. Остальные разделы не изменятся.`
+              : `Всё, что сейчас есть в приложении, будет заменено содержимым файла${dateSuffix}. Действие необратимо — если нужно, сначала сделай экспорт текущих данных.`,
           confirmLabel: 'Импортировать',
         });
         if (!ok) return;
@@ -49,6 +62,8 @@ export function BackupSettings() {
           if (prepared.photos) await replacePlantPhotos(prepared.photos);
           else await clearPlantPhotos();
           importState(prepared.state);
+        } else if (isTaskProject) {
+          importState(replaceTaskProjectData(state, prepared.state));
         } else {
           if (prepared.mode === 'plants') await replacePlantPhotos(prepared.photos ?? []);
           importState(replaceDashboardData(state, prepared.state, prepared.mode));
